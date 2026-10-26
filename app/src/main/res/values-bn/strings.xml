@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">লিখন কীবোর্ড</string>
+    <string name="ime_name">লিখন কীবোর্ড</string>
+    <string name="subtype_label">বাংলা / English</string>
+    <string name="subtype_english">English</string>
+    <string name="subtype_bangla">বাংলা (ফোনেটিক)</string>
+
+    <string name="tagline">দ্রুত ইংরেজি ও ফোনেটিক বাংলা টাইপিং। অফলাইন, কোনো অনুমতি লাগে না।</string>
+    <string name="status_active">কীবোর্ড চালু আছে</string>
+    <string name="status_enabled">কীবোর্ড চালু হয়েছে, কিন্তু নির্বাচন করা হয়নি</string>
+    <string name="status_off">কীবোর্ড এখনো চালু করা হয়নি</string>
+    <string name="status_active_body">যেকোনো অ্যাপে টাইপ করা শুরু করুন। ভাষা কী-তে চেপে ধরলে এই সেটিংস খুলবে।</string>
+    <string name="status_enabled_body">আরেক ধাপ বাকি: কীবোর্ডের তালিকা থেকে “লিখন কীবোর্ড” বেছে নিন।</string>
+    <string name="status_off_body">সিস্টেম সেটিংসে চালু করুন, তারপর কীবোর্ড হিসেবে বেছে নিন।</string>
+    <string name="action_enable">কীবোর্ড চালু করুন</string>
+    <string name="action_choose">কীবোর্ড বেছে নিন</string>
+    <string name="action_change">কীবোর্ড বদলান</string>
+    <string name="action_settings">কীবোর্ড সেটিংস</string>
+    <string name="action_done">সম্পন্ন</string>
+
+    <string name="try_title">এখানে পরীক্ষা করুন</string>
+    <string name="try_hint">কীবোর্ড পরীক্ষা করতে এখানে টাইপ করুন…</string>
+
+    <string name="section_input">ইনপুট ভাষা</string>
+    <string name="section_input_desc">কীবোর্ডের ভাষা কী চাপলেই সাথে সাথে বদলে যাবে।</string>
+    <string name="lang_english">English</string>
+    <string name="lang_bangla">বাংলা</string>
+    <string name="lang_hint">বাংলা ফোনেটিক পদ্ধতিতে লেখা হয়: “ami” লিখলে আমি হয়।</string>
+
+    <string name="section_appearance">রূপ</string>
+    <string name="theme_system">সিস্টেম</string>
+    <string name="theme_light">লাইট</string>
+    <string name="theme_dark">ডার্ক</string>
+
+    <string name="section_typing">টাইপিং</string>
+    <string name="opt_haptic">কম্পন</string>
+    <string name="opt_haptic_desc">প্রতিটি কী চাপে হালকা কম্পন।</string>
+    <string name="opt_sound">কী ক্লিকের শব্দ</string>
+    <string name="opt_sound_desc">সিস্টেমের টাচ-সাউন্ড ভলিউম অনুসরণ করে।</string>
+    <string name="opt_autocap">স্বয়ংক্রিয় বড় হাতের অক্ষর</string>
+    <string name="opt_autocap_desc">ইংরেজিতে বাক্যের শুরুতে বড় হাতের অক্ষর।</string>
+    <string name="opt_hints">বাংলা কী-সংকেত</string>
+    <string name="opt_hints_desc">প্রতিটি ইংরেজি কী-তে বাংলা অক্ষর দেখাবে।</string>
+
+    <string name="section_about">সম্পর্কে</string>
+    <string name="about_body">লিখন একটি ছোট, অফলাইন কীবোর্ড। এটি কোনো অনুমতি চায় না, বিজ্ঞাপন নেই এবং কোথাও কিছু পাঠায় না। ইংরেজি সাধারণ QWERTY লেআউট; বাংলা ফোনেটিক, অর্থাৎ ইংরেজি অক্ষরে যেভাবে উচ্চারণ হয় সেভাবে লিখলেই বাংলা হয়।</string>
+    <string name="about_version">সংস্করণ ১.০</string>
+    <string name="footer">অফলাইন · কোনো অনুমতি নেই · বিজ্ঞাপন নেই</string>
+    <string name="about_guide">বাংলা টাইপিং নির্দেশিকা</string>
+
+    <string name="guide_title">বাংলা টাইপিং নির্দেশিকা</string>
+    <string name="guide_body">যেভাবে উচ্চারণ, সেভাবেই লিখুন।\n\nami → আমি\nkemon → কেমন\nbhalo → ভালো\nkorbo → করবো\ndesh → দেশ\nkintu → কিন্তু\n\nবড় হাতের অক্ষরে মূর্ধন্য ও দীর্ঘ রূপ:\nT → ট   D → ড   N → ণ   S → ষ   R → ড়   O → ও   I → ঈ   U → ঊ\n\nng → ং   ^ → ্   ~ → ঁ   . → ।\n\nব্যঞ্জনের মাঝখানে “o” উচ্চারিত হয় না (kotha → কথা), শব্দের শেষে ো হয় (bhalo → ভালো)।</string>
+
+    <string name="enter_search">খুঁজুন</string>
+    <string name="enter_send">পাঠান</string>
+    <string name="enter_go">যান</string>
+    <string name="enter_done">সম্পন্ন</string>
+    <string name="enter_next">পরবর্তী</string>
+</resources>

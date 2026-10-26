@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Likhon Keyboard</string>
+    <string name="ime_name">Likhon Keyboard</string>
+    <string name="subtype_label">English / বাংলা</string>
+    <string name="subtype_english">English</string>
+    <string name="subtype_bangla">বাংলা (ফোনেটিক)</string>
+
+    <string name="tagline">Fast English and phonetic Bangla typing. Offline, no permissions.</string>
+    <string name="status_active">Keyboard is active</string>
+    <string name="status_enabled">Keyboard is enabled, but not selected</string>
+    <string name="status_off">Keyboard is not enabled yet</string>
+    <string name="status_active_body">You can start typing in any app. Long-press the language key to open these settings.</string>
+    <string name="status_enabled_body">One more step: pick “Likhon Keyboard” from the keyboard list.</string>
+    <string name="status_off_body">Enable it in system settings, then choose it as your keyboard.</string>
+    <string name="action_enable">Enable keyboard</string>
+    <string name="action_choose">Choose keyboard</string>
+    <string name="action_change">Change keyboard</string>
+    <string name="action_settings">Keyboard settings</string>
+    <string name="action_done">Done</string>
+
+    <string name="try_title">Try it here</string>
+    <string name="try_hint">Type here to test the keyboard…</string>
+
+    <string name="section_input">Input language</string>
+    <string name="section_input_desc">The language key inside the keyboard switches instantly.</string>
+    <string name="lang_english">English</string>
+    <string name="lang_bangla">বাংলা</string>
+    <string name="lang_hint">Bangla uses phonetic typing: “ami” becomes আমি.</string>
+
+    <string name="section_appearance">Appearance</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+
+    <string name="section_typing">Typing</string>
+    <string name="opt_haptic">Vibration</string>
+    <string name="opt_haptic_desc">A short tap for every key.</string>
+    <string name="opt_sound">Key click sound</string>
+    <string name="opt_sound_desc">Follows the system touch-sound volume.</string>
+    <string name="opt_autocap">Auto-capitalise</string>
+    <string name="opt_autocap_desc">English: start sentences with a capital letter.</string>
+    <string name="opt_hints">Bangla key hints</string>
+    <string name="opt_hints_desc">Show the Bangla letter on each English key.</string>
+
+    <string name="section_about">About</string>
+    <string name="about_body">Likhon is a small, offline keyboard. It asks for no permissions, has no ads and never sends anything anywhere. English is a standard QWERTY layout; Bangla is phonetic, so you type the sound in English letters.</string>
+    <string name="about_version">Version 1.0</string>
+    <string name="footer">Offline · No permissions · No ads</string>
+    <string name="about_guide">Bangla typing guide</string>
+
+    <string name="guide_title">Bangla typing guide</string>
+    <string name="guide_body">Type words the way they sound.\n\nami → আমি\nkemon → কেমন\nbhalo → ভালো\nkorbo → করবো\ndesh → দেশ\nkintu → কিন্তু\n\nCapital letters give retroflex and long forms:\nT → ট   D → ড   N → ণ   S → ষ   R → ড়   O → ও   I → ঈ   U → ঊ\n\nng → ং   ^ → ্   ~ → ঁ   . → ।\n\n“o” is silent between consonants (kotha → কথা) and becomes ো at the end of a word (bhalo → ভালো).</string>
+
+    <string name="enter_search">Search</string>
+    <string name="enter_send">Send</string>
+    <string name="enter_go">Go</string>
+    <string name="enter_done">Done</string>
+    <string name="enter_next">Next</string>
+</resources>

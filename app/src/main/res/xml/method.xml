@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    One keyboard, two input languages. The language key inside the keyboard
+    switches between English and phonetic Bangla, so no subtype juggling is
+    needed. One ASCII-capable subtype is declared so the IME is also offered in
+    password fields and apps that require an ASCII keyboard.
+-->
+<input-method xmlns:android="http://schemas.android.com/apk/res/android">
+    <subtype
+        android:imeSubtypeLocale="en_US"
+        android:imeSubtypeMode="keyboard"
+        android:isAsciiCapable="true"
+        android:label="@string/subtype_label" />
+</input-method>

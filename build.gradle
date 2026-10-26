@@ -1,0 +1,5 @@
+// Top-level build file. The app itself has no external dependencies:
+// it uses only the Android framework, so builds stay small and fast.
+plugins {
+    id 'com.android.application' version '8.2.2' apply false
+}

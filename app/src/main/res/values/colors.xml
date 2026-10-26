@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#2F6FED</color>
+
+    <color name="theme_light_bg">#EEF1F6</color>
+    <color name="theme_light_surface">#FFFFFF</color>
+    <color name="theme_light_text">#121821</color>
+    <color name="theme_light_text_muted">#66717F</color>
+    <color name="theme_light_accent">#2F6FED</color>
+
+    <color name="theme_dark_bg">#0A0E13</color>
+    <color name="theme_dark_surface">#141A22</color>
+    <color name="theme_dark_text">#EDF2F9</color>
+    <color name="theme_dark_text_muted">#8A97A9</color>
+    <color name="theme_dark_accent">#6E9BFF</color>
+</resources>
