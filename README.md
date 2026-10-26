@@ -4,14 +4,14 @@ A small, fast, **offline** Android keyboard with an English QWERTY layout and
 phonetic Bangla typing. Written in plain Java against the Android framework:
 no AndroidX, no third-party libraries, no internet permission, no ads.
 
-**APK:** `build/manual/LikhonKeyboard-1.0.apk` (also copied to
-`/sdcard/Download/LikhonKeyboard-1.0.apk`)
+**APK:** `build/manual/LikhonKeyboard-1.1.apk` (also copied to
+`/sdcard/Download/LikhonKeyboard-1.1.apk`)
 
 ---
 
 ## Install
 
-1. Open `LikhonKeyboard-1.0.apk` in the Files app and allow "install unknown apps"
+1. Open `LikhonKeyboard-1.1.apk` in the Files app and allow "install unknown apps"
    for that app if asked.
 2. Open **Likhon Keyboard** from the app drawer.
 3. Tap **Enable keyboard** → turn on "Likhon Keyboard".
@@ -29,6 +29,11 @@ the keyboard to open settings at any time.
   (`T` → ট, `D` → ড, `N` → ণ, `S` → ষ, `R` → ড়, `O` → ও, `I` → ঈ, `U` → ঊ).
 - **Live conversion while composing**, so context-dependent spellings work:
   `kotha` → কথা, but `bhalo` → ভালো.
+- **Multi-touch**: every finger is tracked separately, so two thumbs can type
+  at the same time (hold shift with one hand, type with the other) and fast
+  alternating taps are not dropped.
+- **Forgiving keys**: taps that land in the narrow gap between two keys go to
+  the nearest key instead of being ignored.
 - **Auto-capitalise** for English sentences.
 - **Key preview** pop-up, **vibration** and **click sound** options.
 - **Themes**: follow system, light, or dark.
@@ -85,7 +90,7 @@ equivalent ARM64 build script is included. It uses the Ubuntu/Debian
 tools/build-apk-arm64.sh
 ```
 
-Output: `build/manual/LikhonKeyboard-1.0.apk` (signed with the debug key in
+Output: `build/manual/LikhonKeyboard-1.1.apk` (signed with the debug key in
 `keystore/likhon-debug.jks`, generated on first run — keep that file if you want
 future builds to install over the current one).
 
@@ -115,7 +120,22 @@ tools/                  icon generator, phonetic check, ARM64 APK build
 
 `KeyboardView` paints every key itself instead of inflating ~40 Views. That keeps
 the keyboard light, lets a finger slide between keys, and makes the pop-up
-preview and repeat-delete cheap.
+preview and repeat-delete cheap. Touch handling keeps one small state object per
+finger (key, long-press timer, delete-repeat timer), which is what allows
+simultaneous presses.
+
+## Changes
+
+**1.1**
+
+- Multi-touch typing: each finger now has its own key, highlight, long-press
+  and delete-repeat timer. Two letters can be pressed at the same time, and a
+  finger resting on shift no longer blocks the other hand.
+- Gaps between keys are no longer dead space: a tap there goes to the nearest
+  key, so slightly off-centre taps are not dropped.
+- Faster key repeat for delete and a shorter long-press delay.
+
+**1.0** — first release.
 
 ## Known limits
 

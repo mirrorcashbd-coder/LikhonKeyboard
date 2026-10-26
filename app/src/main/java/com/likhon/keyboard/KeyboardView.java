@@ -23,7 +23,8 @@ import java.util.List;
  *
  * <p>Keys are painted on a single canvas instead of being one View each: that
  * keeps the keyboard light, lets a finger slide from key to key, and makes the
- * key pop-up and repeat-delete trivial to implement.
+ * key pop-up and repeat-delete trivial to implement. Each finger is tracked on
+ * its own, so several keys can be held and typed at the same time.
  */
 public class KeyboardView extends View {
 
@@ -40,9 +41,12 @@ public class KeyboardView extends View {
     private static final float GAP_DP = 6f;
     private static final float KEY_RADIUS_DP = 9f;
 
-    private static final long LONG_PRESS_MS = 460;
-    private static final long REPEAT_DELAY_MS = 380;
-    private static final long REPEAT_INTERVAL_MS = 55;
+    private static final long LONG_PRESS_MS = 400;
+    private static final long REPEAT_DELAY_MS = 330;
+    private static final long REPEAT_INTERVAL_MS = 45;
+
+    /** Touch slots; Android reports at most 10 fingers at once. */
+    private static final int MAX_POINTERS = 10;
 
     private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint strokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -64,45 +68,66 @@ public class KeyboardView extends View {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private AudioManager audioManager;
 
-    private int pressedRow = -1;
-    private int pressedCol = -1;
-    private int downRow = -1;
-    private int downCol = -1;
-    private int activePointer = -1;
-    private boolean longPressFired;
-    private boolean repeated;
+    private final Pointer[] pointers = new Pointer[MAX_POINTERS];
+    private int layoutSerial;
 
-    private final Runnable longPressRunnable = new Runnable() {
-        @Override
-        public void run() {
-            Key key = pressedKey();
-            if (key == null || pressedRow != downRow || pressedCol != downCol) {
-                return;
-            }
-            if (key.type != Key.LANGUAGE) {
-                // Only the language key has a long-press action. For every other
-                // key the release still types normally.
-                return;
-            }
-            longPressFired = true;
-            if (listener != null) {
-                listener.onKeyLongPress(key);
-            }
-        }
-    };
+    /**
+     * One finger on the keyboard.
+     *
+     * <p>Every finger gets its own key position, its own long-press timer and
+     * its own delete-repeat timer, so two thumbs can type at the same time and
+     * a finger resting on shift does not swallow the other hand's letters.
+     */
+    private final class Pointer {
+        int id = -1;
+        int row = -1;
+        int col = -1;
+        int downRow = -1;
+        int downCol = -1;
+        Key downKey;
+        int downSerial;
+        boolean longPressFired;
+        boolean repeated;
 
-    private final Runnable repeatRunnable = new Runnable() {
-        @Override
-        public void run() {
-            Key key = pressedKey();
-            if (key == null || key.type != Key.DELETE || listener == null) {
-                return;
+        final Runnable longPress = new Runnable() {
+            @Override
+            public void run() {
+                if (id < 0) {
+                    return;
+                }
+                Key key = keyAt(row, col);
+                if (key == null || row != downRow || col != downCol) {
+                    return;
+                }
+                if (key.type != Key.LANGUAGE) {
+                    // Only the language key has a long-press action. For every
+                    // other key the release still types normally.
+                    return;
+                }
+                longPressFired = true;
+                if (listener != null) {
+                    listener.onKeyLongPress(key);
+                }
             }
-            repeated = true;
-            listener.onKey(key);
-            handler.postDelayed(this, REPEAT_INTERVAL_MS);
+        };
+
+        final Runnable repeat = new Runnable() {
+            @Override
+            public void run() {
+                Key key = keyAt(row, col);
+                if (id < 0 || key == null || key.type != Key.DELETE || listener == null) {
+                    return;
+                }
+                repeated = true;
+                listener.onKey(key);
+                handler.postDelayed(this, REPEAT_INTERVAL_MS);
+            }
+        };
+
+        boolean active() {
+            return id >= 0;
         }
-    };
+    }
 
     public KeyboardView(Context context) {
         this(context, null);
@@ -121,6 +146,9 @@ public class KeyboardView extends View {
         textPaint.setTextAlign(Paint.Align.CENTER);
         textPaint.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         setContentDescription(context.getString(R.string.ime_name));
+        for (int i = 0; i < MAX_POINTERS; i++) {
+            pointers[i] = new Pointer();
+        }
     }
 
     // ------------------------------------------------------------------ state
@@ -147,8 +175,10 @@ public class KeyboardView extends View {
 
     void setKeys(List<Layouts.Row> newRows) {
         layoutRows = newRows == null ? Collections.<Layouts.Row>emptyList() : newRows;
-        pressedRow = -1;
-        pressedCol = -1;
+        layoutSerial++;
+        // Fingers stay tracked across a layout switch (e.g. a resting finger
+        // while the other hand taps shift); each pointer remembers the key it
+        // went down on, so the switch cannot turn it into a different character.
         // The view size usually stays the same when switching letters <->
         // symbols, so onSizeChanged() would not fire: recompute immediately.
         if (getWidth() > 0 && getHeight() > 0) {
@@ -242,7 +272,7 @@ public class KeyboardView extends View {
             Key[] keys = layoutRows.get(r).keys;
             List<RectF> rects = keyRects.get(r);
             for (int c = 0; c < keys.length && c < rects.size(); c++) {
-                drawKey(canvas, keys[c], rects.get(c), r == pressedRow && c == pressedCol);
+                drawKey(canvas, keys[c], rects.get(c), isPressed(r, c));
             }
         }
         drawPreview(canvas);
@@ -463,7 +493,12 @@ public class KeyboardView extends View {
     }
 
     private void drawPreview(Canvas canvas) {
-        Key key = pressedKey();
+        // One pop-up at a time: during two-thumb typing it would only flicker.
+        Pointer only = singlePointer();
+        if (only == null) {
+            return;
+        }
+        Key key = keyAt(only.row, only.col);
         if (key == null || !key.isChar() || key.label.length() > 2) {
             return;
         }
@@ -471,7 +506,7 @@ public class KeyboardView extends View {
         if (codePoint >= 0x1F000) {
             return;
         }
-        RectF r = pressedRect();
+        RectF r = rectAt(only.row, only.col);
         if (r == null) {
             return;
         }
@@ -501,94 +536,194 @@ public class KeyboardView extends View {
     public boolean onTouchEvent(MotionEvent event) {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN: {
-                activePointer = event.getPointerId(0);
-                int row = findRow(event.getX(), event.getY());
-                if (row < 0) {
+                Pointer p = obtainPointer(event.getPointerId(0));
+                if (p == null) {
+                    return true;
+                }
+                if (!placePointer(p, event.getX(), event.getY())) {
+                    releasePointer(p);
                     return false;
                 }
-                longPressFired = false;
-                repeated = false;
-                downRow = row;
-                downCol = findCol(row, event.getX(), event.getY());
-                pressedRow = downRow;
-                pressedCol = downCol;
-                Key key = pressedKey();
-                if (key != null) {
-                    feedback(key);
-                    handler.removeCallbacks(longPressRunnable);
-                    handler.postDelayed(longPressRunnable, LONG_PRESS_MS);
-                    if (key.type == Key.DELETE) {
-                        handler.removeCallbacks(repeatRunnable);
-                        handler.postDelayed(repeatRunnable, REPEAT_DELAY_MS);
-                    }
+                startPointer(p);
+                invalidate();
+                return true;
+            }
+            case MotionEvent.ACTION_POINTER_DOWN: {
+                int index = event.getActionIndex();
+                Pointer p = obtainPointer(event.getPointerId(index));
+                if (p == null) {
+                    return true;
                 }
+                // A second finger is a full participant: it gets its own key,
+                // its own highlight and its own timers. A finger that lands
+                // between keys is still tracked so sliding it onto a key works.
+                placePointer(p, event.getX(index), event.getY(index));
+                startPointer(p);
                 invalidate();
                 return true;
             }
             case MotionEvent.ACTION_MOVE: {
-                int index = event.findPointerIndex(activePointer);
-                if (index < 0) {
-                    return true;
-                }
-                float x = event.getX(index);
-                float y = event.getY(index);
-                int row = findRow(x, y);
-                if (row < 0) {
-                    clearPressed();
-                } else {
-                    int col = findCol(row, x, y);
-                    if (row != pressedRow || col != pressedCol) {
-                        setPressed(row, col);
-                        // Dragging away from delete stops the repeat; dragging
-                        // off the pressed key cancels its long-press action.
-                        Key key = pressedKey();
-                        if (key == null || key.type != Key.DELETE) {
-                            handler.removeCallbacks(repeatRunnable);
-                        }
-                        if (row != downRow || col != downCol) {
-                            handler.removeCallbacks(longPressRunnable);
-                        }
+                boolean changed = false;
+                int count = event.getPointerCount();
+                for (int i = 0; i < count; i++) {
+                    Pointer p = findPointer(event.getPointerId(i));
+                    if (p == null) {
+                        continue;
+                    }
+                    int oldRow = p.row;
+                    int oldCol = p.col;
+                    placePointer(p, event.getX(i), event.getY(i));
+                    if (p.row == oldRow && p.col == oldCol) {
+                        continue;
+                    }
+                    changed = true;
+                    Key key = keyAt(p.row, p.col);
+                    // Dragging away from delete stops its repeat; dragging off
+                    // the pressed key cancels its long-press action.
+                    if (key == null || key.type != Key.DELETE) {
+                        handler.removeCallbacks(p.repeat);
+                    }
+                    if (p.row != p.downRow || p.col != p.downCol) {
+                        handler.removeCallbacks(p.longPress);
                     }
                 }
-                invalidate();
-                return true;
-            }
-            case MotionEvent.ACTION_UP: {
-                handler.removeCallbacks(longPressRunnable);
-                handler.removeCallbacks(repeatRunnable);
-                Key key = pressedKey();
-                if (key != null && !longPressFired && !repeated && listener != null) {
-                    listener.onKey(key);
-                }
-                clearPressed();
-                activePointer = -1;
-                invalidate();
-                return true;
-            }
-            case MotionEvent.ACTION_CANCEL: {
-                handler.removeCallbacks(longPressRunnable);
-                handler.removeCallbacks(repeatRunnable);
-                clearPressed();
-                activePointer = -1;
-                invalidate();
-                return true;
-            }
-            case MotionEvent.ACTION_POINTER_DOWN:
-                // Single-touch keyboard: ignore extra fingers.
-                return true;
-            case MotionEvent.ACTION_POINTER_UP: {
-                int pointerId = event.getPointerId(event.getActionIndex());
-                if (pointerId == activePointer) {
-                    handler.removeCallbacks(longPressRunnable);
-                    handler.removeCallbacks(repeatRunnable);
-                    clearPressed();
-                    activePointer = -1;
+                if (changed) {
                     invalidate();
                 }
                 return true;
             }
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_POINTER_UP: {
+                // Every finger types when it lifts, even while other fingers
+                // are still down: that is what makes fast two-thumb typing work.
+                Pointer p = findPointer(event.getPointerId(event.getActionIndex()));
+                if (p == null) {
+                    return true;
+                }
+                finishPointer(p);
+                invalidate();
+                return true;
+            }
+            case MotionEvent.ACTION_CANCEL: {
+                releaseAllPointers();
+                invalidate();
+                return true;
+            }
             default:
                 return super.onTouchEvent(event);
+        }
+    }
+
+    private Pointer obtainPointer(int id) {
+        for (Pointer p : pointers) {
+            if (p.id == id) {
+                return p;
+            }
+        }
+        for (Pointer p : pointers) {
+            if (!p.active()) {
+                resetPointer(p, id);
+                return p;
+            }
+        }
+        return null;
+    }
+
+    private Pointer findPointer(int id) {
+        for (Pointer p : pointers) {
+            if (p.id == id) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    /** The only finger currently down, or null when there are none or several. */
+    private Pointer singlePointer() {
+        Pointer only = null;
+        for (Pointer p : pointers) {
+            if (!p.active()) {
+                continue;
+            }
+            if (only != null) {
+                return null;
+            }
+            only = p;
+        }
+        return only;
+    }
+
+    private void resetPointer(Pointer p, int id) {
+        handler.removeCallbacks(p.longPress);
+        handler.removeCallbacks(p.repeat);
+        p.id = id;
+        p.row = -1;
+        p.col = -1;
+        p.downRow = -1;
+        p.downCol = -1;
+        p.downKey = null;
+        p.downSerial = layoutSerial;
+        p.longPressFired = false;
+        p.repeated = false;
+    }
+
+    private void releasePointer(Pointer p) {
+        resetPointer(p, -1);
+    }
+
+    private void releaseAllPointers() {
+        for (Pointer p : pointers) {
+            if (p.active()) {
+                releasePointer(p);
+            }
+        }
+    }
+
+    /** True when (x, y) is on a key; false means the finger is on no key. */
+    private boolean placePointer(Pointer p, float x, float y) {
+        int row = findRow(x, y);
+        int col = row < 0 ? -1 : findCol(row, x, y);
+        p.row = row;
+        p.col = col;
+        return row >= 0 && col >= 0;
+    }
+
+    private void startPointer(Pointer p) {
+        p.downRow = p.row;
+        p.downCol = p.col;
+        p.downKey = keyAt(p.row, p.col);
+        p.downSerial = layoutSerial;
+        Key key = p.downKey;
+        if (key == null) {
+            return;
+        }
+        feedback(key);
+        if (key.type == Key.LANGUAGE) {
+            handler.removeCallbacks(p.longPress);
+            handler.postDelayed(p.longPress, LONG_PRESS_MS);
+        }
+        if (key.type == Key.DELETE) {
+            handler.removeCallbacks(p.repeat);
+            handler.postDelayed(p.repeat, REPEAT_DELAY_MS);
+        }
+    }
+
+    private void finishPointer(Pointer p) {
+        handler.removeCallbacks(p.longPress);
+        handler.removeCallbacks(p.repeat);
+        Key key = keyAt(p.row, p.col);
+        if (p.downSerial != layoutSerial) {
+            // The layout changed under this finger (shift, symbols, language,
+            // emoji). Type the key it actually went down on instead of whatever
+            // now happens to sit at the same coordinates.
+            key = (p.row == p.downRow && p.col == p.downCol) ? p.downKey : null;
+        }
+        boolean emit = key != null && !p.longPressFired && !p.repeated && listener != null;
+        // Release first: the listener may rebuild the key grid for the next
+        // layout, and the lifting finger must not be re-read afterwards.
+        releasePointer(p);
+        if (emit) {
+            listener.onKey(key);
         }
     }
 
@@ -602,6 +737,8 @@ public class KeyboardView extends View {
     }
 
     private int findRow(float x, float y) {
+        // Half a gap of slack, so the seams between rows are not dead space.
+        float slack = dp(GAP_DP / 2f);
         for (int r = 0; r < keyRects.size(); r++) {
             List<RectF> rects = keyRects.get(r);
             if (rects.isEmpty()) {
@@ -609,63 +746,73 @@ public class KeyboardView extends View {
             }
             RectF first = rects.get(0);
             RectF last = rects.get(rects.size() - 1);
-            if (y >= first.top - dp(2) && y <= first.bottom + dp(2)
-                    && x >= first.left - dp(GAP_DP) && x <= last.right + dp(GAP_DP)) {
+            if (y >= first.top - slack && y <= first.bottom + slack
+                    && x >= first.left - slack && x <= last.right + slack) {
                 return r;
             }
         }
         return -1;
     }
 
+    /**
+     * Index of the key under the touch, or of the nearest key in the row. The
+     * narrow gaps between keys are not dead space: an off-centre tap still
+     * types the letter the finger is closest to.
+     */
     private int findCol(int row, float x, float y) {
         List<RectF> rects = keyRects.get(row);
+        int best = -1;
+        float bestDistance = Float.MAX_VALUE;
         for (int c = 0; c < rects.size(); c++) {
-            if (rects.get(c).contains(x, y)) {
+            RectF r = rects.get(c);
+            if (r.contains(x, y)) {
                 return c;
             }
+            float dx = x < r.left ? r.left - x : (x > r.right ? x - r.right : 0f);
+            float dy = y < r.top ? r.top - y : (y > r.bottom ? y - r.bottom : 0f);
+            float distance = dx * dx + dy * dy;
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = c;
+            }
         }
-        return -1;
+        return best;
     }
 
-    private void setPressed(int row, int col) {
-        pressedRow = row;
-        pressedCol = col;
+    private Key keyAt(int row, int col) {
+        if (row < 0 || row >= layoutRows.size() || col < 0) {
+            return null;
+        }
+        Key[] keys = layoutRows.get(row).keys;
+        if (col >= keys.length) {
+            return null;
+        }
+        return keys[col];
     }
 
-    private void clearPressed() {
-        pressedRow = -1;
-        pressedCol = -1;
+    private RectF rectAt(int row, int col) {
+        if (row < 0 || row >= keyRects.size() || col < 0) {
+            return null;
+        }
+        List<RectF> rects = keyRects.get(row);
+        if (col >= rects.size()) {
+            return null;
+        }
+        return rects.get(col);
     }
 
-    private Key pressedKey() {
-        if (pressedRow < 0 || pressedRow >= layoutRows.size()) {
-            return null;
+    private boolean isPressed(int row, int col) {
+        for (Pointer p : pointers) {
+            if (p.active() && p.row == row && p.col == col) {
+                return true;
+            }
         }
-        if (pressedCol < 0) {
-            return null;
-        }
-        Key[] keys = layoutRows.get(pressedRow).keys;
-        if (pressedCol >= keys.length) {
-            return null;
-        }
-        return keys[pressedCol];
-    }
-
-    private RectF pressedRect() {
-        if (pressedRow < 0 || pressedRow >= keyRects.size()) {
-            return null;
-        }
-        List<RectF> rects = keyRects.get(pressedRow);
-        if (pressedCol < 0 || pressedCol >= rects.size()) {
-            return null;
-        }
-        return rects.get(pressedCol);
+        return false;
     }
 
     @Override
     protected void onDetachedFromWindow() {
-        handler.removeCallbacks(longPressRunnable);
-        handler.removeCallbacks(repeatRunnable);
+        releaseAllPointers();
         super.onDetachedFromWindow();
     }
 

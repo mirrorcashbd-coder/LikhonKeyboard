@@ -20,8 +20,8 @@ SDK="${ANDROID_SDK_ROOT:-/root/android-sdk}"
 PLATFORM="$SDK/platforms/android-34/android.jar"
 D8_JAR="$SDK/build-tools/34.0.0/lib/d8.jar"
 OUT="build/manual"
-VERSION_NAME="1.0"
-VERSION_CODE="1"
+VERSION_NAME="1.1"
+VERSION_CODE="2"
 MIN_SDK="23"
 TARGET_SDK="34"
 
@@ -102,3 +102,10 @@ apksigner verify --print-certs "$OUT/LikhonKeyboard-$VERSION_NAME.apk" | head -5
 echo
 echo "APK: $(pwd)/$OUT/LikhonKeyboard-$VERSION_NAME.apk"
 echo "Size: $(du -h "$OUT/LikhonKeyboard-$VERSION_NAME.apk" | cut -f1)"
+
+# Convenience for phones: put a copy where the file manager can find it.
+DOWNLOAD="/sdcard/Download"
+if [ -d "$DOWNLOAD" ]; then
+    cp "$OUT/LikhonKeyboard-$VERSION_NAME.apk" "$DOWNLOAD/LikhonKeyboard-$VERSION_NAME.apk"
+    echo "Copied to: $DOWNLOAD/LikhonKeyboard-$VERSION_NAME.apk"
+fi
