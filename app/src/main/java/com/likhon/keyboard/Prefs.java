@@ -93,7 +93,7 @@ final class Prefs {
 
     /** Use the phone's own voice screen instead of the inline stream. */
     boolean voiceSheet() {
-        return sp.getBoolean(KEY_VOICE_SHEET, true);
+        return sp.getBoolean(KEY_VOICE_SHEET, false);
     }
 
     /** Keyboard size as a fraction of the calculated height (0.5 – 2.2). */

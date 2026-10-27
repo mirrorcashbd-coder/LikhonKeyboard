@@ -2,6 +2,7 @@ package com.likhon.keyboard;
 
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -57,6 +58,7 @@ final class VoiceInput implements RecognitionListener {
 
     private SpeechRecognizer recognizer;
     private int startFailures;
+    private boolean onDevice;
     private boolean wantListening;
     private boolean continuous;
     private String language = "bn-BD";
@@ -84,6 +86,35 @@ final class VoiceInput implements RecognitionListener {
         return wantListening;
     }
 
+    boolean isOnDevice() {
+        return onDevice;
+    }
+
+    /**
+     * Switches the running session to Android's on-device recogniser. Used as a
+     * last resort when the phone's normal speech service never answers.
+     */
+    void preferOnDevice() {
+        if (onDevice) {
+            return;
+        }
+        onDevice = true;
+        destroyRecognizer();
+        handler.removeCallbacks(restart);
+        begin();
+    }
+
+    static boolean onDeviceAvailable(Context context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            return false;
+        }
+        try {
+            return SpeechRecognizer.isOnDeviceRecognitionAvailable(context);
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
     /**
      * Starts a session. When {@code continuous} is true the recogniser restarts
      * after each phrase until {@link #stop()} is called.
@@ -91,6 +122,7 @@ final class VoiceInput implements RecognitionListener {
     void start(String languageTag, boolean continuous) {
         this.language = languageTag == null || languageTag.isEmpty() ? "bn-BD" : languageTag;
         this.continuous = continuous;
+        this.onDevice = false;
         this.wantListening = true;
         this.lastPartial = "";
         if (!available()) {
@@ -108,8 +140,14 @@ final class VoiceInput implements RecognitionListener {
         }
         if (recognizer == null) {
             try {
-                recognizer = SpeechRecognizer.createSpeechRecognizer(
-                        context.getApplicationContext());
+                if (onDevice && onDeviceAvailable(context)) {
+                    recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(
+                            context.getApplicationContext());
+                } else {
+                    onDevice = false;
+                    recognizer = SpeechRecognizer.createSpeechRecognizer(
+                            context.getApplicationContext());
+                }
                 recognizer.setRecognitionListener(this);
             } catch (RuntimeException e) {
                 recognizer = null;
@@ -241,6 +279,17 @@ final class VoiceInput implements RecognitionListener {
             // Cancelled or stopped by us; the error is just the shutdown.
             return;
         }
+        if (onDevice && (error == 12 || error == 13)) {
+            // The on-device model has no such language; go back to the phone's
+            // normal service instead of stopping.
+            onDevice = false;
+            destroyRecognizer();
+            listener.onVoiceHint(error);
+            if (continuous) {
+                handler.postDelayed(restart, RESTART_DELAY_MS);
+                return;
+            }
+        }
         boolean recoverable = error == SpeechRecognizer.ERROR_NO_MATCH
                 || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
                 || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
@@ -293,6 +342,39 @@ final class VoiceInput implements RecognitionListener {
 
     @Override
     public void onEvent(int eventType, Bundle params) {
+    }
+
+    static String errorName(int error) {
+        switch (error) {
+            case SpeechRecognizer.ERROR_NETWORK_TIMEOUT:
+                return "NETWORK_TIMEOUT";
+            case SpeechRecognizer.ERROR_NETWORK:
+                return "NETWORK";
+            case SpeechRecognizer.ERROR_AUDIO:
+                return "AUDIO";
+            case SpeechRecognizer.ERROR_SERVER:
+                return "SERVER";
+            case SpeechRecognizer.ERROR_CLIENT:
+                return "CLIENT";
+            case SpeechRecognizer.ERROR_SPEECH_TIMEOUT:
+                return "SPEECH_TIMEOUT";
+            case SpeechRecognizer.ERROR_NO_MATCH:
+                return "NO_MATCH";
+            case SpeechRecognizer.ERROR_RECOGNIZER_BUSY:
+                return "BUSY";
+            case SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS:
+                return "PERMISSIONS";
+            case SpeechRecognizer.ERROR_TOO_MANY_REQUESTS:
+                return "TOO_MANY_REQUESTS";
+            case SpeechRecognizer.ERROR_SERVER_DISCONNECTED:
+                return "SERVER_DISCONNECTED";
+            case 12:
+                return "LANGUAGE_NOT_SUPPORTED";
+            case 13:
+                return "LANGUAGE_UNAVAILABLE";
+            default:
+                return "ERROR_" + error;
+        }
     }
 
     private String best(Bundle bundle) {

@@ -6,14 +6,14 @@ no AndroidX, no third-party libraries, no ads, and nothing of its own ever goes
 online (the `INTERNET` permission is declared only for speech services that run
 inside the calling app).
 
-**APK:** `build/manual/LikhonKeyboard-1.5.apk` (also copied to
-`/sdcard/Download/LikhonKeyboard-1.5.apk`)
+**APK:** `build/manual/LikhonKeyboard-1.6.apk` (also copied to
+`/sdcard/Download/LikhonKeyboard-1.6.apk`)
 
 ---
 
 ## Install
 
-1. Open `LikhonKeyboard-1.5.apk` in the Files app and allow "install unknown apps"
+1. Open `LikhonKeyboard-1.6.apk` in the Files app and allow "install unknown apps"
    for that app if asked.
 2. Open **Likhon Keyboard** from the app drawer.
 3. Tap **Enable keyboard** → turn on "Likhon Keyboard".
@@ -62,15 +62,17 @@ the keyboard to open settings at any time.
 
 Tap the **microphone** key (bottom row of the letters and symbols pages) once.
 
-There are two ways to dictate, switched in settings:
+By default the keyboard stays exactly where it is and a strip appears above
+the keys: microphone, language chip, level bar and **Stop**. Words appear as
+you speak, just like Gboard's Rambler.
 
-- **Phone voice screen** (default): the speech screen your phone already has
-  opens — the same one other apps use. Speak, then the sentence is inserted
-  when you return to the app. The recogniser records from a foreground screen,
-  which is the path phones are most likely to allow.
-- **Inline strip**: turn the switch off. A strip appears above the keyboard
-  with the microphone, the language chip, a level bar and a **Stop** button,
-  and words appear as you speak.
+Long-press the mic key (or turn on the setting) to use the phone's own speech
+screen instead. That path covers phones which refuse to hand audio to an input
+method, but the keyboard hides while it is open.
+
+When the phone's speech service keeps hearing nothing, the strip tries the other
+Bangla model (bn-IN) and then Android's on-device recogniser, saying which one
+it is using.
 
 Settings also has a **Microphone check** (records 1.5 s and reports the level)
 and a **Speech service check** (runs one recognition and prints the result or
@@ -204,7 +206,7 @@ equivalent ARM64 build script is included. It uses the Ubuntu/Debian
 tools/build-apk-arm64.sh
 ```
 
-Output: `build/manual/LikhonKeyboard-1.5.apk` (signed with the debug key in
+Output: `build/manual/LikhonKeyboard-1.6.apk` (signed with the debug key in
 `keystore/likhon-debug.jks`, generated on first run — keep that file if you want
 future builds to install over the current one).
 
@@ -253,6 +255,19 @@ finger (key, long-press timer, delete-repeat timer), which is what allows
 simultaneous presses.
 
 ## Changes
+
+**1.6**
+
+- Voice typing is **inline again by default**: the keyboard stays visible and a
+  strip above the keys shows the level and the words as they arrive. The phone's
+  speech screen is now only on long-press of the mic key (or the setting).
+- If Bangla (bn-BD) hears nothing twice in automatic mode, the strip switches to
+  Bangla (India, bn-IN) and says so, instead of retrying the same silent model.
+- Failures are no longer silent: the strip shows “nothing was heard (NO_MATCH)”
+  and a fatal error leaves the strip on screen with its name, so the reason can
+  be read without a computer.
+- The Banglish choice is visible in the strip: the chip cycles বাংলা → Banglish
+  → English, and the same switch is in settings.
 
 **1.5**
 

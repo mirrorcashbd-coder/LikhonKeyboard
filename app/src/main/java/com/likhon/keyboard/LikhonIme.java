@@ -62,6 +62,9 @@ public class LikhonIme extends InputMethodService
     private String pendingSheetPackage;
     private int voiceMisses;
     private boolean voiceSheetHintShown;
+    private boolean voiceOnDeviceTried;
+    /** Language tried after Bangla (India) when bn-BD hears nothing. */
+    private String voiceLangOverride;
 
     private Suggestions suggestions;
     private LearnedWords learned;
@@ -559,6 +562,12 @@ public class LikhonIme extends InputMethodService
 
     @Override
     public void onKeyLongPress(Key key) {
+        if (key != null && key.type == Key.MIC) {
+            // Long press: the phone's own voice screen, for phones that refuse
+            // to hand audio to an input method.
+            startVoiceSheet();
+            return;
+        }
         if (key != null && key.type == Key.LANGUAGE) {
             Intent intent = new Intent(this, SettingsActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
@@ -798,6 +807,8 @@ public class LikhonIme extends InputMethodService
         voiceListening = true;
         voiceMisses = 0;
         voiceSheetHintShown = false;
+        voiceOnDeviceTried = false;
+        voiceLangOverride = null;
         keyboardView.setVoiceActive(true);
         voicePanel.setVisibility(View.VISIBLE);
         voiceStatus.setText(R.string.voice_listening);
@@ -882,6 +893,7 @@ public class LikhonIme extends InputMethodService
         }
         voiceListening = false;
         voicePreviewing = false;
+        voiceLangOverride = null;
         resetVoiceLevel();
         if (keyboardView != null) {
             keyboardView.setVoiceActive(false);
@@ -894,6 +906,9 @@ public class LikhonIme extends InputMethodService
     }
 
     private String voiceLanguage() {
+        if (voiceLangOverride != null) {
+            return voiceLangOverride;
+        }
         String configured = prefs.voiceLang();
         if (Prefs.VOICE_AUTO.equals(configured)) {
             return bangla ? "bn-BD" : "en-US";
@@ -932,6 +947,7 @@ public class LikhonIme extends InputMethodService
             prefs.setVoiceLang("en-US");
             prefs.setBoolean(Prefs.KEY_VOICE_BANGLISH, false);
         }
+        voiceLangOverride = null;
         updateVoiceLabels();
         if (voiceListening && voice != null) {
             // Apply the new language to the running session immediately.
@@ -1143,9 +1159,15 @@ public class LikhonIme extends InputMethodService
         if (code == SpeechRecognizer.ERROR_NO_MATCH
                 || code == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
             voiceMisses++;
-            if (voiceMisses >= 3 && !voiceSheetHintShown) {
+            if (tryBanglaFallback()) {
+                return;
+            }
+            if (tryOnDeviceFallback()) {
+                return;
+            }
+            if (voiceMisses >= 6 && !voiceSheetHintShown) {
                 voiceSheetHintShown = true;
-                Toast.makeText(this, R.string.voice_sheet_hint, Toast.LENGTH_LONG).show();
+                Toast.makeText(this, R.string.voice_check_hint, Toast.LENGTH_LONG).show();
             }
         } else {
             voiceMisses = 0;
@@ -1153,10 +1175,49 @@ public class LikhonIme extends InputMethodService
         voiceStatus.setText(voiceHintText(code));
     }
 
+    /**
+     * Some phones have bn-IN but not bn-BD. After two silent attempts in
+     * automatic mode, try the other Bangla model before giving up.
+     */
+    private boolean tryBanglaFallback() {
+        if (voiceLangOverride != null || voice == null || voiceMisses < 2) {
+            return false;
+        }
+        if (!voiceIsBangla() || !Prefs.VOICE_AUTO.equals(prefs.voiceLang())) {
+            return false;
+        }
+        if (!"bn-BD".equals(voiceLanguage())) {
+            return false;
+        }
+        voiceLangOverride = "bn-IN";
+        voice.cancel();
+        voice.start("bn-IN", prefs.voiceContinuous());
+        if (voiceStatus != null) {
+            voiceStatus.setText(R.string.voice_trying_bn_in);
+        }
+        return true;
+    }
+
+    /** Android's own offline model, when the phone's speech service stays mute. */
+    private boolean tryOnDeviceFallback() {
+        if (voiceOnDeviceTried || voiceMisses < 4 || voice == null) {
+            return false;
+        }
+        if (!VoiceInput.onDeviceAvailable(this)) {
+            return false;
+        }
+        voiceOnDeviceTried = true;
+        voice.preferOnDevice();
+        if (voiceStatus != null) {
+            voiceStatus.setText(R.string.voice_trying_on_device);
+        }
+        return true;
+    }
+
     private String voiceHintText(int code) {
         if (code == SpeechRecognizer.ERROR_NO_MATCH
                 || code == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
-            return getString(R.string.voice_heard_nothing);
+            return getString(R.string.voice_heard_nothing, VoiceInput.errorName(code));
         }
         if (code == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
                 || code == SpeechRecognizer.ERROR_CLIENT) {
@@ -1169,13 +1230,20 @@ public class LikhonIme extends InputMethodService
     public void onVoiceError(int code) {
         voiceListening = false;
         voicePreviewing = false;
+        resetVoiceLevel();
         if (keyboardView != null) {
             keyboardView.setVoiceActive(false);
         }
+        // Keep the strip on screen with the reason: a panel that vanishes
+        // without a word is what made the first inline version look dead.
         if (voicePanel != null) {
-            voicePanel.setVisibility(View.GONE);
+            voicePanel.setVisibility(View.VISIBLE);
         }
-        Toast.makeText(this, voiceErrorMessage(code), Toast.LENGTH_LONG).show();
+        String message = voiceErrorMessage(code) + " (" + VoiceInput.errorName(code) + ")";
+        if (voiceStatus != null) {
+            voiceStatus.setText(message);
+        }
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 
     @Override

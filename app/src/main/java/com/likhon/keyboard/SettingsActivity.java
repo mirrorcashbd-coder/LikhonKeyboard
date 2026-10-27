@@ -580,7 +580,7 @@ public class SettingsActivity extends Activity {
 
             @Override
             public void onError(int error) {
-                finishSpeechTest(getString(R.string.voice_test_failed, errorName(error)));
+                finishSpeechTest(getString(R.string.voice_test_failed, VoiceInput.errorName(error)));
             }
 
             @Override
@@ -643,39 +643,6 @@ public class SettingsActivity extends Activity {
                 // Already disconnected.
             }
             speechTest = null;
-        }
-    }
-
-    private String errorName(int error) {
-        switch (error) {
-            case SpeechRecognizer.ERROR_NETWORK_TIMEOUT:
-                return "NETWORK_TIMEOUT";
-            case SpeechRecognizer.ERROR_NETWORK:
-                return "NETWORK";
-            case SpeechRecognizer.ERROR_AUDIO:
-                return "AUDIO";
-            case SpeechRecognizer.ERROR_SERVER:
-                return "SERVER";
-            case SpeechRecognizer.ERROR_CLIENT:
-                return "CLIENT";
-            case SpeechRecognizer.ERROR_SPEECH_TIMEOUT:
-                return "SPEECH_TIMEOUT";
-            case SpeechRecognizer.ERROR_NO_MATCH:
-                return "NO_MATCH";
-            case SpeechRecognizer.ERROR_RECOGNIZER_BUSY:
-                return "BUSY";
-            case SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS:
-                return "PERMISSIONS";
-            case SpeechRecognizer.ERROR_TOO_MANY_REQUESTS:
-                return "TOO_MANY_REQUESTS";
-            case SpeechRecognizer.ERROR_SERVER_DISCONNECTED:
-                return "SERVER_DISCONNECTED";
-            case 12:
-                return "LANGUAGE_NOT_SUPPORTED";
-            case 13:
-                return "LANGUAGE_UNAVAILABLE";
-            default:
-                return "ERROR_" + error;
         }
     }
 
