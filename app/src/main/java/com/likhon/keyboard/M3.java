@@ -112,6 +112,13 @@ final class M3 {
         LinearLayout column = Ui.vertical(c);
         LinearLayout barWrap = Ui.vertical(c);
         barWrap.setPadding(dp(c, 12), dp(c, 10), dp(c, 12), dp(c, 6));
+        // The wallpaper runs under the status bar, so the top bar moves down
+        // by exactly the inset instead of being covered by the clock.
+        barWrap.setOnApplyWindowInsetsListener((v, insets) -> {
+            v.setPadding(dp(c, 12), dp(c, 10) + insets.getSystemWindowInsetTop(),
+                    dp(c, 12), dp(c, 6));
+            return insets;
+        });
         barWrap.addView(bar);
         column.addView(barWrap);
 
@@ -120,6 +127,10 @@ final class M3 {
         scroll.setClipToPadding(false);
         scroll.setVerticalScrollBarEnabled(false);
         scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        scroll.setOnApplyWindowInsetsListener((v, insets) -> {
+            v.setPadding(0, 0, 0, insets.getSystemWindowInsetBottom());
+            return insets;
+        });
         scroll.addView(body, new ScrollView.LayoutParams(
                 ScrollView.LayoutParams.MATCH_PARENT,
                 ScrollView.LayoutParams.WRAP_CONTENT));
@@ -250,20 +261,8 @@ final class M3 {
 
     /** Brighter glass pill used for the selected segment. */
     private static Drawable raisedPill(Context c, Palette p, float radiusDp) {
-        GradientDrawable base = new GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM, new int[]{
-                ((p.dark ? 0x4C : 0xF4) << 24) | 0x00FFFFFF,
-                ((p.dark ? 0x30 : 0xD8) << 24) | 0x00FFFFFF});
-        base.setCornerRadius(dp(c, radiusDp));
-        base.setStroke(Math.max(1, dp(c, 1.1f)),
-                ((p.dark ? 0x70 : 0xFF) << 24) | 0x00FFFFFF);
-        GradientDrawable sheen = new GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{(p.dark ? 0x1A : 0x40) << 24 | 0x00FFFFFF, 0x00FFFFFF});
-        sheen.setCornerRadius(dp(c, radiusDp - 1));
-        LayerDrawable layers = new LayerDrawable(new Drawable[]{base, sheen});
-        layers.setLayerInset(1, dp(c, 1), dp(c, 1), dp(c, 1), dp(c, 1));
-        return layers;
+        return new LiquidGlassDrawable(c, p, radiusDp, 0x00FFFFFF,
+                p.dark ? 0.18f : 0.38f);
     }
 
     static LinearLayout segmented(Context c, Palette p, CharSequence[] labels, int selected,

@@ -20,7 +20,8 @@ final class LiquidGlassDialog extends Dialog {
     private final LiquidGlassPanel panel;
 
     private LiquidGlassDialog(Context context, Palette palette, CharSequence title,
-                              CharSequence message, Runnable confirm) {
+                              CharSequence message, CharSequence positive, Runnable onPositive,
+                              CharSequence negative, Runnable onNegative) {
         super(context, android.R.style.Theme_Translucent_NoTitleBar);
         final float density = context.getResources().getDisplayMetrics().density;
 
@@ -63,24 +64,28 @@ final class LiquidGlassDialog extends Dialog {
         buttonsParams.topMargin = dp(density, 22);
         column.addView(buttons, buttonsParams);
 
-        TextView cancel = dialogButton(context, palette,
-                context.getString(R.string.dialog_cancel), 0,
-                (palette.text & 0x00FFFFFF) | 0x1A000000);
-        cancel.setOnClickListener(v -> dismiss());
-        LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT);
-        cancelParams.rightMargin = dp(density, 10);
-        buttons.addView(cancel, cancelParams);
+        if (negative != null) {
+            TextView cancel = dialogButton(context, palette, negative, palette.text, 0,
+                    (palette.text & 0x00FFFFFF) | 0x1A000000);
+            cancel.setOnClickListener(v -> {
+                dismiss();
+                if (onNegative != null) {
+                    onNegative.run();
+                }
+            });
+            LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            cancelParams.rightMargin = dp(density, 10);
+            buttons.addView(cancel, cancelParams);
+        }
 
-        TextView ok = dialogButton(context, palette,
-                context.getString(R.string.dialog_ok), palette.onAccent,
-                0x33FFFFFF);
-        ok.setBackground(Glass.control(context, palette, 22, palette.accent, 0x33FFFFFF));
+        TextView ok = dialogButton(context, palette, positive, palette.onAccent,
+                palette.accent, 0x33FFFFFF);
         ok.setOnClickListener(v -> {
             dismiss();
-            if (confirm != null) {
-                confirm.run();
+            if (onPositive != null) {
+                onPositive.run();
             }
         });
         buttons.addView(ok, new LinearLayout.LayoutParams(
@@ -120,16 +125,30 @@ final class LiquidGlassDialog extends Dialog {
         setCanceledOnTouchOutside(true);
     }
 
+    /** A plain notice: one "OK" button and nothing else. */
+    static LiquidGlassDialog show(Activity activity, Palette palette, CharSequence title,
+                                  CharSequence message) {
+        return show(activity, palette, title, message, (Runnable) null);
+    }
+
+    /** One action: the positive button is "OK" and there is no cancel. */
     static LiquidGlassDialog show(Activity activity, Palette palette, CharSequence title,
                                   CharSequence message, Runnable confirm) {
-        LiquidGlassDialog dialog = new LiquidGlassDialog(activity, palette, title,
-                message, confirm);
+        return show(activity, palette, title, message,
+                activity.getString(R.string.dialog_ok), confirm, null, null);
+    }
+
+    static LiquidGlassDialog show(Activity activity, Palette palette, CharSequence title,
+                                  CharSequence message, CharSequence positive, Runnable onPositive,
+                                  CharSequence negative, Runnable onNegative) {
+        LiquidGlassDialog dialog = new LiquidGlassDialog(activity, palette, title, message,
+                positive, onPositive, negative, onNegative);
         dialog.show();
         return dialog;
     }
 
-    private static TextView dialogButton(Context context, Palette palette, String label,
-                                         int color, int ripple) {
+    private static TextView dialogButton(Context context, Palette palette, CharSequence label,
+                                         int color, int tint, int ripple) {
         TextView view = new TextView(context);
         view.setText(label);
         view.setTextSize(14.5f);
@@ -140,7 +159,7 @@ final class LiquidGlassDialog extends Dialog {
         view.setPadding(dp(density, 20), dp(density, 12),
                 dp(density, 20), dp(density, 12));
         view.setGravity(Gravity.CENTER);
-        view.setBackground(Glass.control(context, palette, 22, 0, ripple));
+        view.setBackground(Glass.control(context, palette, 22, tint, ripple));
         view.setClickable(true);
         view.setFocusable(true);
         return view;

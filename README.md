@@ -474,9 +474,28 @@ Motion: press springs to 94.5% and settles with an overshoot, the bottom bar's
 selection pill slides, toolbars fade and lift in, the dialog scales up. All of
 it is switched off when the system animation scale is zero.
 
-The showcase opens from Settings → Liquid glass demo (also linked in About).
+Every surface uses this material now: all eight settings screens (cards, the
+floating top bar, tiles, chips, segmented controls, buttons and text fields),
+the confirmation and guide dialogs, and the keyboard's clipboard, translate,
+more and voice panels. The blurred backdrop is captured once per window and
+size and reused, so scrolling a screen full of glass costs one bitmap sample
+per pane. The standalone showcase opens from Settings → Liquid glass demo
+(also linked in About).
 
 ## Changes
+
+**1.21**
+
+- The whole app now runs on the same liquid-glass engine as the showcase:
+  every settings card, the top bar, tiles, chips, segmented controls, buttons
+  and text fields sample the real blurred background under themselves.
+- Each window captures its own backdrop once (wallpaper, theme wash and accent
+  blobs), so panels look identical to the demo and scroll without extra blur
+  work.
+- Confirmation, permission and guide dialogs are now floating glass dialogs,
+  and the keyboard's clipboard, translate, more and voice sheets are glass.
+- Selection pills, filled buttons and chips use tinted glass instead of flat
+  gradients.
 
 **1.20**
 

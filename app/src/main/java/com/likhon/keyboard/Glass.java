@@ -1,133 +1,71 @@
 package com.likhon.keyboard;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.ColorFilter;
 import android.graphics.Color;
+import android.graphics.ColorFilter;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
-import android.graphics.Rect;
 import android.graphics.RadialGradient;
-import android.graphics.RectF;
+import android.graphics.Rect;
 import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
-import android.graphics.drawable.LayerDrawable;
 import android.graphics.drawable.RippleDrawable;
-import android.content.res.ColorStateList;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
+import java.util.WeakHashMap;
+
 /**
- * iOS 27 style liquid glass, painted by hand.
+ * The app's glass: every panel, card, bar, chip, button and field is painted
+ * with {@link LiquidGlass} over a blurred copy of the real background.
  *
- * <p>Each panel is four layers: a translucent white fill, a lighter top sheen,
- * a diagonal specular rim that catches the light at the top-left, and the soft
- * elevation shadow underneath. The backdrop is a mesh of four huge, smooth
- * colour blobs, so whatever shows through the glass is already soft — that is
- * what sells the frosted look without a real blur pass.
+ * <p>The backdrop is rendered once per window and size (wallpaper, theme wash
+ * and accent blobs), downscaled, blurred and published for the window. Glass
+ * surfaces then sample the part under themselves, so the material behaves the
+ * same here as on the showcase screen.
  */
 final class Glass {
 
     static final int CARD = 0;
     static final int BAR = 1;
 
-    private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint glossPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint tintPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint rimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private Shader rimShader;
-    private final RectF rect = new RectF();
-    private final Palette palette;
-    private final float radiusPx;
-    private final float strokePx;
-    private final int kind;
-    private float builtW = -1;
-    private float builtH = -1;
+    /** Blurred backdrop per window (the key is the decor view). */
+    private static final WeakHashMap<View, GlassBackdrop> BACKDROPS = new WeakHashMap<>();
+    /** Last capture, reused by the other settings screens (same size/palette). */
+    private static GlassBackdrop shared;
+    private static int sharedW = -1;
+    private static int sharedH = -1;
+    private static int sharedAccent;
+    private static boolean sharedDark;
 
-    Glass(Palette palette, float radiusPx, float strokePx, int kind) {
-        this.palette = palette;
-        this.radiusPx = radiusPx;
-        this.strokePx = strokePx;
-        this.kind = kind;
-        rimPaint.setStyle(Paint.Style.STROKE);
-        rimPaint.setStrokeWidth(strokePx);
+    private Glass() {
     }
 
-    void draw(Canvas canvas, float w, float h) {
-        if (w <= 0 || h <= 0) {
-            return;
+    static GlassBackdrop backdropFor(View view) {
+        if (view == null) {
+            return null;
         }
-        if (w != builtW || h != builtH) {
-            build(w, h);
-        }
-        float r = Math.min(radiusPx, Math.min(w, h) / 2f);
-        rect.set(0, 0, w, h);
-        canvas.drawRoundRect(rect, r, r, fillPaint);
-        canvas.drawRoundRect(rect, r, r, tintPaint);
-        canvas.drawRoundRect(rect, r, r, glossPaint);
-
-        // Light caught inside the edge of the glass: a few soft rings that get
-        // brighter as they approach the rim, like a drop of water.
-        rimPaint.setShader(null);
-        int halo = palette.dark ? 0x2E : 0x34;
-        for (int ring = 3; ring >= 1; ring--) {
-            float width = strokePx * 2f * ring;
-            rimPaint.setStrokeWidth(width);
-            rimPaint.setColor(((halo / ring) << 24) | 0x00FFFFFF);
-            float inset = width / 2f;
-            rect.set(inset, inset, w - inset, h - inset);
-            canvas.drawRoundRect(rect, Math.max(1f, r - inset),
-                    Math.max(1f, r - inset), rimPaint);
-        }
-
-        // The bright hairline that defines the edge.
-        rimPaint.setShader(rimShader);
-        rimPaint.setStrokeWidth(strokePx * 1.15f);
-        float inset = strokePx * 0.58f;
-        rect.set(inset, inset, w - inset, h - inset);
-        canvas.drawRoundRect(rect, Math.max(1f, r - inset),
-                Math.max(1f, r - inset), rimPaint);
+        return BACKDROPS.get(view.getRootView());
     }
 
-    private void build(float w, float h) {
-        builtW = w;
-        builtH = h;
-        boolean dark = palette.dark;
-
-        int topAlpha = dark ? (kind == BAR ? 0x2C : 0x1C)
-                : (kind == BAR ? 0x7A : 0x58);
-        int bottomAlpha = dark ? (kind == BAR ? 0x18 : 0x0C)
-                : (kind == BAR ? 0x5C : 0x3A);
-        fillPaint.setShader(new LinearGradient(0, 0, 0, h,
-                (topAlpha << 24) | 0x00FFFFFF, (bottomAlpha << 24) | 0x00FFFFFF,
-                Shader.TileMode.CLAMP));
-
-        int glossAlpha = dark ? 0x16 : 0x2A;
-        glossPaint.setShader(new LinearGradient(0, 0, 0, h * 0.68f,
-                (glossAlpha << 24) | 0x00FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
-
-        int[] rimColors = dark
-                ? new int[]{0x8CFFFFFF, 0x30FFFFFF, 0x24FFFFFF, 0x5CFFFFFF}
-                : new int[]{0xFFFFFFFF, 0xD2FFFFFF, 0xBAFFFFFF, 0xF4FFFFFF};
-        rimShader = new LinearGradient(0, 0, w, h, rimColors, null,
-                Shader.TileMode.CLAMP);
-        rimPaint.setShader(rimShader);
-
-        tintPaint.setColor(((dark ? 0x16 : 0x12) << 24) | (palette.accent & 0x00FFFFFF));
+    static void publish(View view, GlassBackdrop backdrop) {
+        if (view != null && backdrop != null) {
+            BACKDROPS.put(view.getRootView(), backdrop);
+        }
     }
 
     // ------------------------------------------------------------- backdrops
 
     /**
-     * Paints the colour mesh that sits behind every glass panel: a soft base
-     * gradient and four huge, smooth blobs. Because the blobs are already
-     * soft, anything seen through a translucent panel reads as frosted glass
-     * without a real blur pass.
+     * Paints what sits behind the glass: a soft base gradient, the blurred
+     * wallpaper (centre-cropped, with a theme wash) and four huge accent blobs.
      */
     static final class BackdropPainter {
         private final Context context;
@@ -205,23 +143,101 @@ final class Glass {
         }
     }
 
-    /** Screen-sized mesh backdrop. */
+    /**
+     * Renders a backdrop painter into a small blurred bitmap tied to a view's
+     * position. Never call this from inside that view's own onDraw loop more
+     * than once per size.
+     */
+    static GlassBackdrop capture(View view, BackdropPainter painter) {
+        int w = view.getWidth();
+        int h = view.getHeight();
+        if (w <= 0 || h <= 0) {
+            return null;
+        }
+        int smallW = Math.max(64, Math.min(240, w / 6));
+        int smallH = Math.max(64, Math.min(480, h / 6));
+        Bitmap bitmap = Bitmap.createBitmap(smallW, smallH, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        canvas.scale(smallW / (float) w, smallH / (float) h);
+        painter.draw(canvas, w, h);
+        GlassBackdrop.blur(bitmap);
+
+        GlassBackdrop backdrop = GlassBackdrop.of(bitmap, w, h);
+        if (backdrop == null) {
+            return null;
+        }
+        int[] location = new int[2];
+        view.getLocationInWindow(location);
+        backdrop.setOrigin(location[0], location[1], w, h);
+        return backdrop;
+    }
+
+    private static GlassBackdrop reusable(int w, int h, Palette palette) {
+        if (shared != null && sharedW == w && sharedH == h
+                && sharedAccent == palette.accent && sharedDark == palette.dark) {
+            return shared;
+        }
+        return null;
+    }
+
+    private static void remember(GlassBackdrop backdrop, int w, int h, Palette palette) {
+        shared = backdrop;
+        sharedW = w;
+        sharedH = h;
+        sharedAccent = palette.accent;
+        sharedDark = palette.dark;
+    }
+
+    /** Screen-sized backdrop view: paints the background and publishes it. */
     static final class Backdrop extends View {
         private final BackdropPainter painter;
+        private final Palette palette;
+        private GlassBackdrop image;
+        private GlassBackdrop published;
 
         Backdrop(Context context, Palette palette) {
             super(context);
+            this.palette = palette;
             painter = new BackdropPainter(context, palette);
             setWillNotDraw(false);
         }
 
         @Override
+        protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+            super.onSizeChanged(w, h, oldw, oldh);
+            image = null;
+            published = null;
+        }
+
+        @Override
         protected void onDraw(Canvas canvas) {
-            painter.draw(canvas, getWidth(), getHeight());
+            int w = getWidth();
+            int h = getHeight();
+            if (w <= 0 || h <= 0) {
+                return;
+            }
+            painter.draw(canvas, w, h);
+
+            if (image == null) {
+                image = reusable(w, h, palette);
+                if (image == null) {
+                    image = capture(this, painter);
+                    if (image != null) {
+                        remember(image, w, h, palette);
+                    }
+                }
+            }
+            if (image != null && published != image) {
+                publish(this, image);
+                published = image;
+                // Panels earlier in the tree may have drawn with the old
+                // backdrop; one more pass aligns everything.
+                postInvalidateOnAnimation();
+            }
         }
     }
 
-    /** The same mesh as a drawable, for views that only take a background. */
+    /** The same backdrop as a drawable, for views that only take a background. */
     static final class BackdropDrawable extends Drawable {
         private final BackdropPainter painter;
 
@@ -251,9 +267,49 @@ final class Glass {
 
     // ---------------------------------------------------------------- panels
 
+    /** Shared glass painting for our container views. */
+    static final class Surface {
+        private final LiquidGlass.Painter painter = new LiquidGlass.Painter();
+        private final LiquidGlass.Config config = new LiquidGlass.Config();
+        private final Palette palette;
+        private final float density;
+        private final int[] location = new int[2];
+
+        Surface(Context context, Palette palette, float radiusDp, int kind) {
+            this.palette = palette;
+            density = context.getResources().getDisplayMetrics().density;
+            config.radiusDp = radiusDp;
+            config.borderWidthDp = 1.1f;
+            config.reflectionAlpha = 0.6f;
+            config.refraction = 1.05f;
+            if (kind == BAR) {
+                config.tintAlpha = 0.20f;
+                config.haloAlpha = 0.30f;
+                config.haloWidthDp = 10f;
+                config.glossAlpha = 0.30f;
+            } else {
+                config.tintAlpha = 0.15f;
+                config.haloAlpha = 0.26f;
+                config.haloWidthDp = 9f;
+                config.glossAlpha = 0.28f;
+            }
+        }
+
+        void draw(Canvas canvas, View view) {
+            int w = view.getWidth();
+            int h = view.getHeight();
+            if (w <= 0 || h <= 0) {
+                return;
+            }
+            view.getLocationInWindow(location);
+            painter.configure(palette, config, Glass.backdropFor(view), density);
+            painter.draw(canvas, w, h, location[0], location[1], 0f);
+        }
+    }
+
     /** Glass surface that stacks its children vertically (or horizontally). */
     static final class Panel extends LinearLayout {
-        private final Glass glass;
+        private final Surface surface;
 
         Panel(Context context, Palette palette, float radiusDp, int kind, boolean horizontal) {
             super(context);
@@ -262,8 +318,7 @@ final class Glass {
                 setGravity(Gravity.CENTER_VERTICAL);
             }
             setWillNotDraw(false);
-            glass = new Glass(palette, Ui.dp(context, radiusDp),
-                    Math.max(1f, Ui.dp(context, 1.1f)), kind);
+            surface = new Surface(context, palette, radiusDp, kind);
             GradientDrawable outline = new GradientDrawable();
             outline.setColor(0x00000000);
             outline.setCornerRadius(Ui.dp(context, radiusDp));
@@ -272,19 +327,18 @@ final class Glass {
 
         @Override
         protected void onDraw(Canvas canvas) {
-            glass.draw(canvas, getWidth(), getHeight());
+            surface.draw(canvas, this);
         }
     }
 
     /** Glass surface for tiles, where a foreground ripple is wanted. */
     static final class Tile extends FrameLayout {
-        private final Glass glass;
+        private final Surface surface;
 
         Tile(Context context, Palette palette, float radiusDp, int kind) {
             super(context);
             setWillNotDraw(false);
-            glass = new Glass(palette, Ui.dp(context, radiusDp),
-                    Math.max(1f, Ui.dp(context, 1.1f)), kind);
+            surface = new Surface(context, palette, radiusDp, kind);
             GradientDrawable outline = new GradientDrawable();
             outline.setColor(0x00000000);
             outline.setCornerRadius(Ui.dp(context, radiusDp));
@@ -293,66 +347,27 @@ final class Glass {
 
         @Override
         protected void onDraw(Canvas canvas) {
-            glass.draw(canvas, getWidth(), getHeight());
+            surface.draw(canvas, this);
         }
     }
 
     // ------------------------------------------------------- small controls
 
     /** Glass fill for text views, buttons and chips. */
-    static GradientDrawable fill(Context c, Palette p, float radiusDp, int tint) {
-        int top;
-        int bottom;
-        if (tint != 0) {
-            top = ((p.dark ? 0xE8 : 0xF0) << 24)
-                    | (Palette.mix(tint, 0xFFFFFF, p.dark ? 0.20f : 0.14f) & 0x00FFFFFF);
-            bottom = ((p.dark ? 0xCE : 0xDC) << 24) | (tint & 0x00FFFFFF);
-        } else {
-            top = ((p.dark ? 0x26 : 0x58) << 24) | 0x00FFFFFF;
-            bottom = ((p.dark ? 0x11 : 0x36) << 24) | 0x00FFFFFF;
-        }
-        GradientDrawable drawable = new GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM, new int[]{top, bottom});
-        drawable.setCornerRadius(Ui.dp(c, radiusDp));
-        drawable.setStroke(Math.max(1, Ui.dp(c, 1.1f)),
-                ((p.dark ? 0x62 : 0xE8) << 24) | 0x00FFFFFF);
-        return drawable;
+    static Drawable fill(Context c, Palette p, float radiusDp, int tint) {
+        return new LiquidGlassDrawable(c, p, radiusDp, tint,
+                tint == 0 ? 0f : (p.dark ? 0.84f : 0.80f));
     }
 
     /** Fill + top sheen, wrapped in a ripple. */
     static Drawable control(Context c, Palette p, float radiusDp, int tint, int rippleColor) {
-        GradientDrawable base = fill(c, p, radiusDp, tint);
-        GradientDrawable sheen = new GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{(p.dark ? 0x14 : 0x28) << 24 | 0x00FFFFFF, 0x00FFFFFF});
-        sheen.setCornerRadius(Ui.dp(c, Math.max(1f, radiusDp - 1f)));
-        GradientDrawable halo = new GradientDrawable();
-        halo.setColor(0x00000000);
-        halo.setCornerRadius(Ui.dp(c, Math.max(1f, radiusDp - 2f)));
-        halo.setStroke(Math.max(1, Ui.dp(c, 2.4f)),
-                ((p.dark ? 0x22 : 0x2A) << 24) | 0x00FFFFFF);
-        LayerDrawable layers = new LayerDrawable(new Drawable[]{base, sheen, halo});
-        layers.setLayerInset(1, Ui.dp(c, 1), Ui.dp(c, 1), Ui.dp(c, 1), Ui.dp(c, 1));
-        layers.setLayerInset(2, Ui.dp(c, 1), Ui.dp(c, 1), Ui.dp(c, 1), Ui.dp(c, 1));
+        Drawable base = fill(c, p, radiusDp, tint);
         GradientDrawable mask = Ui.rounded(c, 0xFFFFFFFF, radiusDp);
-        return new RippleDrawable(ColorStateList.valueOf(rippleColor), layers, mask);
+        return new RippleDrawable(ColorStateList.valueOf(rippleColor), base, mask);
     }
 
     /** Flat glass for views that later receive a ripple themselves. */
     static Drawable glass(Context c, Palette p, float radiusDp, int tint) {
-        GradientDrawable base = fill(c, p, radiusDp, tint);
-        GradientDrawable sheen = new GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{(p.dark ? 0x14 : 0x28) << 24 | 0x00FFFFFF, 0x00FFFFFF});
-        sheen.setCornerRadius(Ui.dp(c, Math.max(1f, radiusDp - 1f)));
-        GradientDrawable halo = new GradientDrawable();
-        halo.setColor(0x00000000);
-        halo.setCornerRadius(Ui.dp(c, Math.max(1f, radiusDp - 2f)));
-        halo.setStroke(Math.max(1, Ui.dp(c, 2.4f)),
-                ((p.dark ? 0x22 : 0x2A) << 24) | 0x00FFFFFF);
-        LayerDrawable layers = new LayerDrawable(new Drawable[]{base, sheen, halo});
-        layers.setLayerInset(1, Ui.dp(c, 1), Ui.dp(c, 1), Ui.dp(c, 1), Ui.dp(c, 1));
-        layers.setLayerInset(2, Ui.dp(c, 1), Ui.dp(c, 1), Ui.dp(c, 1), Ui.dp(c, 1));
-        return layers;
+        return fill(c, p, radiusDp, tint);
     }
 }

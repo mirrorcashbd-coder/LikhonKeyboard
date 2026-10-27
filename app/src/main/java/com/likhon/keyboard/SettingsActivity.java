@@ -2,7 +2,6 @@ package com.likhon.keyboard;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -163,15 +162,13 @@ public class SettingsActivity extends Activity {
         if (store.size() == 0) {
             return;
         }
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.settings_clipboard)
-                .setMessage(getString(R.string.clip_clear_confirm, store.size()))
-                .setNegativeButton(android.R.string.cancel, null)
-                .setPositiveButton(R.string.clip_clear, (dialog, which) -> {
+        LiquidGlassDialog.show(this, palette, getString(R.string.settings_clipboard),
+                getString(R.string.clip_clear_confirm, store.size()),
+                getString(R.string.clip_clear), () -> {
                     store.clear();
                     refreshClipStore();
-                })
-                .show();
+                },
+                getString(android.R.string.cancel), null);
     }
 
     // ------------------------------------------------------- new settings bits
@@ -362,35 +359,36 @@ public class SettingsActivity extends Activity {
     }
 
     private void confirmClearLearned() {
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.section_learned)
-                .setMessage(R.string.learned_clear_confirm)
-                .setNegativeButton(android.R.string.cancel, null)
-                .setPositiveButton(R.string.learned_clear, (dialog, which) -> {
+        LiquidGlassDialog.show(this, palette, getString(R.string.section_learned),
+                getString(R.string.learned_clear_confirm),
+                getString(R.string.learned_clear), () -> {
                     new LearnedWords(this).clear();
                     refreshLearnedCount();
-                })
-                .show();
+                },
+                getString(android.R.string.cancel), null);
     }
 
     private void confirmResetAll() {
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.reset_all)
-                .setMessage(R.string.reset_all_confirm)
-                .setNegativeButton(android.R.string.cancel, null)
-                .setPositiveButton(R.string.reset_all, (dialog, which) -> {
+        LiquidGlassDialog.show(this, palette, getString(R.string.reset_all),
+                getString(R.string.reset_all_confirm),
+                getString(R.string.reset_all), () -> {
                     prefs.raw().edit().clear().apply();
                     recreate();
-                })
-                .show();
+                },
+                getString(android.R.string.cancel), null);
     }
 
     private void configureWindow() {
         Window window = getWindow();
-        window.setStatusBarColor(palette.bgTop);
-        window.setNavigationBarColor(palette.bgTop);
+        // Edge to edge: the blurred wallpaper runs under the bars, exactly as
+        // on the showcase screen. The screens add the insets themselves.
+        window.setStatusBarColor(0x00000000);
+        window.setNavigationBarColor(0x00000000);
         View decor = window.getDecorView();
         int flags = decor.getSystemUiVisibility();
+        flags |= View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
         if (palette.dark) {
             flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -1044,9 +1042,9 @@ public class SettingsActivity extends Activity {
 
             LinearLayout chip = Ui.horizontal(this);
             chip.setPadding(dp(7), dp(10), dp(9), dp(10));
-            GradientDrawable base = Glass.fill(this, palette, 18, 0);
+            LiquidGlassDrawable base = (LiquidGlassDrawable) Glass.fill(this, palette, 18, 0);
             if (selected) {
-                base.setStroke(dp(2), palette.accent);
+                base.setEdge(palette.accent, 2f);
             }
             chip.setBackground(new android.graphics.drawable.RippleDrawable(
                     android.content.res.ColorStateList.valueOf(0x1A000000), base,
@@ -1582,12 +1580,9 @@ public class SettingsActivity extends Activity {
         }
         refreshVoiceStatus();
         if (grantResults.length > 0 && grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-            new AlertDialog.Builder(this, palette.dark ? R.style.Theme_Likhon_Dialog_Dark
-                    : R.style.Theme_Likhon_Dialog_Light)
-                    .setTitle(R.string.voice_permission_denied)
-                    .setMessage(R.string.voice_permission_denied_body)
-                    .setPositiveButton(R.string.action_done, null)
-                    .show();
+            LiquidGlassDialog.show(this, palette,
+                    getString(R.string.voice_permission_denied),
+                    getString(R.string.voice_permission_denied_body));
         }
     }
 
@@ -1668,12 +1663,8 @@ public class SettingsActivity extends Activity {
     }
 
     private void showGuide() {
-        new AlertDialog.Builder(this, palette.dark ? R.style.Theme_Likhon_Dialog_Dark
-                : R.style.Theme_Likhon_Dialog_Light)
-                .setTitle(R.string.guide_title)
-                .setMessage(R.string.guide_body)
-                .setPositiveButton(R.string.action_done, null)
-                .show();
+        LiquidGlassDialog.show(this, palette, getString(R.string.guide_title),
+                getString(R.string.guide_body));
     }
 
     private void openKeyboardSettings() {
@@ -1725,7 +1716,8 @@ public class SettingsActivity extends Activity {
                 selected ? palette.success : enabled ? palette.accent : palette.textMuted, 5));
         enableButton.setText(enabled ? R.string.action_settings : R.string.action_enable);
         chooseButton.setText(selected ? R.string.action_change : R.string.action_choose);
-        chooseButton.setBackground(Ui.ripple(this, palette.accent, 22, 0x33FFFFFF));
+        chooseButton.setBackground(Glass.control(this, palette, 22, palette.accent,
+                0x33FFFFFF));
         chooseButton.setTextColor(palette.onAccent);
 
         if (chipEnglish != null) {

@@ -59,6 +59,12 @@ final class LiquidGlass {
         float borderAlpha = 0.9f;
         /** 1 = flat sample, 1.08 = slightly magnified like a lens. */
         float refraction = 1.07f;
+        /** Solid tint laid over the sample, for filled buttons (0..1 alpha). */
+        int overlayColor;
+        float overlayAlpha;
+        /** Extra edge line, e.g. the accent ring on a selected chip. */
+        int edgeColor;
+        float edgeWidthDp;
         boolean colorful = true;
         /** Pressed scale; 1 disables the spring. */
         float pressScale = 0.945f;
@@ -75,6 +81,10 @@ final class LiquidGlass {
             c.borderWidthDp = borderWidthDp;
             c.borderAlpha = borderAlpha;
             c.refraction = refraction;
+            c.overlayColor = overlayColor;
+            c.overlayAlpha = overlayAlpha;
+            c.edgeColor = edgeColor;
+            c.edgeWidthDp = edgeWidthDp;
             c.colorful = colorful;
             c.pressScale = pressScale;
             return c;
@@ -173,6 +183,12 @@ final class LiquidGlass {
                 blobPaint.setShader(null);
             }
 
+            if (config.overlayAlpha > 0.001f) {
+                int alpha = clampAlpha(config.overlayAlpha * 255f);
+                paint.setColor((alpha << 24) | (config.overlayColor & 0x00FFFFFF));
+                canvas.drawRect(0, 0, w, h, paint);
+            }
+
             glossPaint.setShader(gloss);
             canvas.drawRect(0, 0, w, h, glossPaint);
             glossPaint.setShader(null);
@@ -217,6 +233,17 @@ final class LiquidGlass {
             rect.set(inset, inset, w - inset, h - inset);
             canvas.drawRoundRect(rect, Math.max(1f, radius - inset),
                     Math.max(1f, radius - inset), rimPaint);
+
+            if (config.edgeColor != 0 && config.edgeWidthDp > 0.1f) {
+                float width = Math.max(1f, config.edgeWidthDp * density);
+                rimPaint.setShader(null);
+                rimPaint.setColor(config.edgeColor);
+                rimPaint.setStrokeWidth(width);
+                float edgeInset = width / 2f;
+                rect.set(edgeInset, edgeInset, w - edgeInset, h - edgeInset);
+                canvas.drawRoundRect(rect, Math.max(1f, radius - edgeInset),
+                        Math.max(1f, radius - edgeInset), rimPaint);
+            }
             rimPaint.setShader(null);
         }
 
