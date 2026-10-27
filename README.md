@@ -427,14 +427,71 @@ and a theme rewrite for widgets this keyboard already draws itself, and the
 whole settings/backup stack would still depend on Google's support libraries
 for very little gain.
 
-## Toolbar icons## Toolbar icons
+## Toolbar icons
 
 The toolbar uses Material Design line icons as vector drawables
 (`res/drawable/ic_undo.xml` and friends, Apache 2.0) instead of emoji, tinted
 with the current theme. Every tap plays a short squash-and-settle animation and
 undo/redo pivot to show the way the history moved.
 
+## Liquid glass components
+
+A second, fully reusable glass system lives beside the older painter and is
+what the demo screen is built from. Everything is plain Java on Canvas, no
+AndroidX, no Compose, no layout XML:
+
+| Class | What it is |
+| --- | --- |
+| `LiquidGlass` | The material itself: config plus the layered painter. |
+| `GlassBackdrop` | A small blurred bitmap of what sits behind the glass, sampled per control. |
+| `GlassSurfaceView` | Base view: sampling, press spring, outline and shadow. |
+| `LiquidGlassCircleButton` | The big round button from the reference. |
+| `LiquidGlassIconButton` | Any-size glass button with a configurable corner radius. |
+| `LiquidGlassPillButton` | Wide pill: nested glass disc, label, chevron. |
+| `LiquidGlassPanel` | A glass container for arbitrary content. |
+| `LiquidGlassFloatingToolbar` | A floating glass bar of icon actions. |
+| `LiquidGlassBottomNavigation` | Glass bar with an animated selection pill. |
+| `LiquidGlassDialog` | Floating glass dialog with a scale/fade entrance. |
+
+How the glass is built, in draw order: the backdrop fragment (magnified 1.06 –
+1.10x around the centre as a cheap lens), a white wash, an accent tint, four
+soft cyan/blue/violet/pink reflections, a top gloss sheet, a seven-ring inner
+halo that reads as one smooth glow, and a diagonal specular hairline. Rainbows
+are not faked: the reflections are tinted by the palette, on top of whatever
+the photo already contributes.
+
+**Blur, honestly.** Android cannot blur the siblings behind an arbitrary View;
+`RenderEffect` only affects the node it is attached to. So the system keeps a
+downscaled bitmap of the real background (the wallpaper, or a capture of a
+background view through `GlassBackdrop.capture`) and box-blurs it once in
+software, never per frame. Each pane then samples the fragment underneath
+itself, which is why moving a control over the photo shows the correct part of
+the photo inside it. `Window.setBackgroundBlurRadius` is used for the dialog on
+Android 12+ where the device supports cross-window blur, with an ordinary
+translucent window everywhere else.
+
+Motion: press springs to 94.5% and settles with an overshoot, the bottom bar's
+selection pill slides, toolbars fade and lift in, the dialog scales up. All of
+it is switched off when the system animation scale is zero.
+
+The showcase opens from Settings → Liquid glass demo (also linked in About).
+
 ## Changes
+
+**1.20**
+
+- New reusable liquid-glass component system: circle buttons, pill buttons,
+  icon buttons, panels, a floating toolbar, a bottom navigation bar and a
+  dialog, all configurable and all drawn natively on Canvas.
+- Real background blur: a downscaled, box-blurred bitmap of the wallpaper (or a
+  captured background view) is sampled under every pane, magnified slightly to
+  read as a glass lens. Cross-window blur is used behind the dialog on
+  Android 12+ where the device supports it.
+- Layered material: white wash, accent tint, four colour reflections, gloss,
+  a smooth seven-ring inner halo and a diagonal specular rim.
+- Spring press animation, an animated selection pill and entrance animations,
+  all disabled when the system asks for reduced motion.
+- New "Liquid Glass" showcase screen, linked from Settings and About.
 
 **1.19**
 

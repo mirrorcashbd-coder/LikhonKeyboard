@@ -594,6 +594,10 @@ public class SettingsActivity extends Activity {
                 getString(R.string.home_keyboard), getString(R.string.home_keyboard_sub),
                 this::openKeyboardSettings));
         more.addView(M3.divider(this, palette));
+        more.addView(M3.navRow(this, palette, R.drawable.ic_droplet,
+                getString(R.string.demo_open), getString(R.string.demo_open_sub),
+                () -> startActivity(new Intent(this, GlassDemoActivity.class))));
+        more.addView(M3.divider(this, palette));
         more.addView(M3.navRow(this, palette, R.drawable.ic_settings,
                 getString(R.string.section_about), getString(R.string.about_short),
                 () -> open(SCREEN_ABOUT)));
@@ -972,6 +976,10 @@ public class SettingsActivity extends Activity {
         links.addView(M3.navRow(this, palette, R.drawable.ic_keyboard,
                 getString(R.string.home_keyboard), getString(R.string.home_keyboard_sub),
                 this::openKeyboardSettings));
+        links.addView(M3.divider(this, palette));
+        links.addView(M3.navRow(this, palette, R.drawable.ic_droplet,
+                getString(R.string.demo_open), getString(R.string.demo_open_sub),
+                () -> startActivity(new Intent(this, GlassDemoActivity.class))));
         addCard(body, links);
 
         return subScreen(R.string.screen_about, R.string.screen_about_desc, body);
