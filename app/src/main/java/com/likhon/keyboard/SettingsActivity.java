@@ -7,9 +7,18 @@ import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.media.AudioFormat;
+import android.media.AudioRecord;
+import android.media.MediaRecorder;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.provider.Settings;
+import android.speech.RecognitionListener;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
@@ -23,6 +32,7 @@ import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -50,6 +60,12 @@ public class SettingsActivity extends Activity {
     private LinearLayout voiceLangChips;
     private TextView micStatus;
     private TextView micButton;
+    private TextView micTestResult;
+    private TextView voiceTestResult;
+    private SpeechRecognizer speechTest;
+    private final Handler testHandler = new Handler(Looper.getMainLooper());
+    private final Runnable speechTimeout = () ->
+            finishSpeechTest(getString(R.string.voice_test_empty));
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -356,6 +372,32 @@ public class SettingsActivity extends Activity {
                 Prefs.KEY_VOICE_CONTINUOUS, prefs.voiceContinuous());
         addSwitchRow(card, R.string.opt_voice_cleanup, R.string.opt_voice_cleanup_desc,
                 Prefs.KEY_VOICE_CLEANUP, prefs.voiceCleanup());
+        addSwitchRow(card, R.string.opt_voice_sheet, R.string.opt_voice_sheet_desc,
+                Prefs.KEY_VOICE_SHEET, prefs.voiceSheet());
+
+        LinearLayout micRow = Ui.horizontal(this);
+        TextView micLabel = Ui.text(this, getString(R.string.mic_test_title), 13,
+                palette.text, true);
+        micLabel.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        micRow.addView(micLabel);
+        micRow.addView(Ui.button(this, palette, getString(R.string.mic_test_action), false,
+                this::testMicrophone));
+        addWithTopMargin(card, micRow, 14);
+        micTestResult = Ui.text(this, "", 12, palette.textMuted, false);
+        card.addView(micTestResult);
+
+        LinearLayout speechRow = Ui.horizontal(this);
+        TextView speechLabel = Ui.text(this, getString(R.string.voice_test_title), 13,
+                palette.text, true);
+        speechLabel.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        speechRow.addView(speechLabel);
+        speechRow.addView(Ui.button(this, palette, getString(R.string.voice_test_action), false,
+                this::testSpeech));
+        addWithTopMargin(card, speechRow, 14);
+        voiceTestResult = Ui.text(this, "", 12, palette.textMuted, false);
+        card.addView(voiceTestResult);
 
         TextView note = Ui.text(this, getString(R.string.voice_note), 12,
                 palette.textMuted, false);
@@ -426,6 +468,221 @@ public class SettingsActivity extends Activity {
         micButton.setText(granted ? R.string.voice_permission_ok
                 : R.string.voice_permission_action);
         micButton.setVisibility(granted ? View.GONE : View.VISIBLE);
+    }
+
+    // ------------------------------------------------------- voice self-checks
+
+    /** Records 1.5 s and reports the peak level, so a dead or blocked mic shows. */
+    private void testMicrophone() {
+        if (!hasMicPermission()) {
+            requestMicPermission();
+            return;
+        }
+        if (micTestResult == null) {
+            return;
+        }
+        micTestResult.setText(R.string.mic_test_running);
+        new Thread(() -> {
+            int peak = -1;
+            int rate = 16000;
+            AudioRecord record = null;
+            try {
+                int min = AudioRecord.getMinBufferSize(rate, AudioFormat.CHANNEL_IN_MONO,
+                        AudioFormat.ENCODING_PCM_16BIT);
+                record = new AudioRecord(MediaRecorder.AudioSource.MIC, rate,
+                        AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
+                        Math.max(min, rate * 2));
+                if (record.getState() == AudioRecord.STATE_INITIALIZED) {
+                    record.startRecording();
+                    short[] buffer = new short[rate / 10];
+                    int max = 0;
+                    long end = SystemClock.elapsedRealtime() + 1500;
+                    while (SystemClock.elapsedRealtime() < end) {
+                        int read = record.read(buffer, 0, buffer.length);
+                        for (int i = 0; i < read; i++) {
+                            int value = Math.abs(buffer[i]);
+                            if (value > max) {
+                                max = value;
+                            }
+                        }
+                    }
+                    record.stop();
+                    peak = max;
+                }
+            } catch (RuntimeException ignored) {
+                peak = -1;
+            } finally {
+                if (record != null) {
+                    record.release();
+                }
+            }
+            final int level = peak;
+            runOnUiThread(() -> {
+                if (micTestResult == null) {
+                    return;
+                }
+                if (level < 0) {
+                    micTestResult.setText(R.string.mic_test_failed);
+                } else if (level < 200) {
+                    micTestResult.setText(getString(R.string.mic_test_silent, level));
+                } else {
+                    micTestResult.setText(getString(R.string.mic_test_ok, level));
+                }
+            });
+        }).start();
+    }
+
+    /** Runs one recognition from this activity, where speech always has focus. */
+    private void testSpeech() {
+        if (!hasMicPermission()) {
+            requestMicPermission();
+            return;
+        }
+        if (voiceTestResult == null) {
+            return;
+        }
+        stopSpeechTest();
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            voiceTestResult.setText(R.string.voice_test_unavailable);
+            return;
+        }
+        voiceTestResult.setText(R.string.voice_test_running);
+        final SpeechRecognizer recognizer = SpeechRecognizer.createSpeechRecognizer(this);
+        speechTest = recognizer;
+        recognizer.setRecognitionListener(new RecognitionListener() {
+            @Override
+            public void onReadyForSpeech(Bundle params) {
+            }
+
+            @Override
+            public void onBeginningOfSpeech() {
+            }
+
+            @Override
+            public void onRmsChanged(float rmsdB) {
+            }
+
+            @Override
+            public void onBufferReceived(byte[] buffer) {
+            }
+
+            @Override
+            public void onEndOfSpeech() {
+            }
+
+            @Override
+            public void onPartialResults(Bundle partialResults) {
+            }
+
+            @Override
+            public void onEvent(int eventType, Bundle params) {
+            }
+
+            @Override
+            public void onError(int error) {
+                finishSpeechTest(getString(R.string.voice_test_failed, errorName(error)));
+            }
+
+            @Override
+            public void onResults(Bundle results) {
+                ArrayList<String> matches = results == null ? null
+                        : results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                String text = matches == null || matches.isEmpty()
+                        ? "" : matches.get(0).trim();
+                finishSpeechTest(text.isEmpty()
+                        ? getString(R.string.voice_test_empty)
+                        : getString(R.string.voice_test_ok, text));
+            }
+        });
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, testLanguage());
+        intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
+        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+        try {
+            recognizer.startListening(intent);
+        } catch (RuntimeException e) {
+            finishSpeechTest(getString(R.string.voice_test_failed,
+                    e.getClass().getSimpleName()));
+            return;
+        }
+        testHandler.postDelayed(speechTimeout, 8000);
+    }
+
+    private String testLanguage() {
+        String configured = prefs.voiceLang();
+        if (Prefs.VOICE_AUTO.equals(configured)) {
+            return prefs.bangla() ? "bn-BD" : "en-US";
+        }
+        return configured;
+    }
+
+    private void finishSpeechTest(String message) {
+        testHandler.removeCallbacks(speechTimeout);
+        if (speechTest != null) {
+            try {
+                speechTest.destroy();
+            } catch (RuntimeException ignored) {
+                // Already disconnected.
+            }
+            speechTest = null;
+        }
+        if (voiceTestResult != null) {
+            voiceTestResult.setText(message);
+        }
+    }
+
+    private void stopSpeechTest() {
+        testHandler.removeCallbacks(speechTimeout);
+        if (speechTest != null) {
+            try {
+                speechTest.cancel();
+                speechTest.destroy();
+            } catch (RuntimeException ignored) {
+                // Already disconnected.
+            }
+            speechTest = null;
+        }
+    }
+
+    private String errorName(int error) {
+        switch (error) {
+            case SpeechRecognizer.ERROR_NETWORK_TIMEOUT:
+                return "NETWORK_TIMEOUT";
+            case SpeechRecognizer.ERROR_NETWORK:
+                return "NETWORK";
+            case SpeechRecognizer.ERROR_AUDIO:
+                return "AUDIO";
+            case SpeechRecognizer.ERROR_SERVER:
+                return "SERVER";
+            case SpeechRecognizer.ERROR_CLIENT:
+                return "CLIENT";
+            case SpeechRecognizer.ERROR_SPEECH_TIMEOUT:
+                return "SPEECH_TIMEOUT";
+            case SpeechRecognizer.ERROR_NO_MATCH:
+                return "NO_MATCH";
+            case SpeechRecognizer.ERROR_RECOGNIZER_BUSY:
+                return "BUSY";
+            case SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS:
+                return "PERMISSIONS";
+            case SpeechRecognizer.ERROR_TOO_MANY_REQUESTS:
+                return "TOO_MANY_REQUESTS";
+            case SpeechRecognizer.ERROR_SERVER_DISCONNECTED:
+                return "SERVER_DISCONNECTED";
+            case 12:
+                return "LANGUAGE_NOT_SUPPORTED";
+            case 13:
+                return "LANGUAGE_UNAVAILABLE";
+            default:
+                return "ERROR_" + error;
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        stopSpeechTest();
     }
 
     @Override

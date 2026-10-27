@@ -2,8 +2,22 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Voice typing only. Recognition itself is done by the phone's speech
-         service; this app never connects to the network. -->
+         service, which owns the audio. Some of those services run inside the
+         calling app, so the INTERNET permission is declared here for them;
+         Likhon itself never sends anything to a server. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Android 11+ hides other apps' services unless they are declared here,
+         which made voice typing look available but never receive audio. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="false"
@@ -23,6 +37,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".VoiceSheetActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity="com.likhon.keyboard.voicesheet"
+            android:theme="@style/Theme.Likhon.Sheet" />
 
         <service
             android:name=".LikhonIme"

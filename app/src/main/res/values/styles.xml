@@ -25,6 +25,13 @@
         <item name="android:colorControlActivated">@color/theme_dark_accent</item>
     </style>
 
+    <style name="Theme.Likhon.Sheet" parent="@android:style/Theme.Translucent.NoTitleBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowIsTranslucent">true</item>
+    </style>
+
     <style name="Theme.Likhon.Dialog.Light" parent="@android:style/Theme.Material.Light.Dialog.Alert">
         <item name="android:colorAccent">@color/theme_light_accent</item>
         <item name="android:windowBackground">@color/theme_light_surface</item>

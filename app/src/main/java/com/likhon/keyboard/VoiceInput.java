@@ -35,6 +35,9 @@ final class VoiceInput implements RecognitionListener {
         /** A finished phrase, ready to be inserted. */
         void onVoiceResult(String text);
 
+        /** A recoverable problem (nothing heard, service busy); still listening. */
+        void onVoiceHint(int code);
+
         /** All listening has stopped (after stop, or after a fatal error). */
         void onVoiceStopped();
 
@@ -53,6 +56,7 @@ final class VoiceInput implements RecognitionListener {
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private SpeechRecognizer recognizer;
+    private int startFailures;
     private boolean wantListening;
     private boolean continuous;
     private String language = "bn-BD";
@@ -104,7 +108,8 @@ final class VoiceInput implements RecognitionListener {
         }
         if (recognizer == null) {
             try {
-                recognizer = SpeechRecognizer.createSpeechRecognizer(context);
+                recognizer = SpeechRecognizer.createSpeechRecognizer(
+                        context.getApplicationContext());
                 recognizer.setRecognitionListener(this);
             } catch (RuntimeException e) {
                 recognizer = null;
@@ -115,10 +120,20 @@ final class VoiceInput implements RecognitionListener {
         }
         try {
             recognizer.startListening(intent());
+            startFailures = 0;
             listener.onVoiceListening();
         } catch (RuntimeException e) {
-            // A recogniser that is busy or was killed throws here.
+            // Busy, unbound, or the service died underneath us.
+            startFailures++;
             destroyRecognizer();
+            if (startFailures >= 3) {
+                // Never spin forever behind a microphone that records nothing:
+                // surface the failure instead.
+                wantListening = false;
+                listener.onVoiceError(SpeechRecognizer.ERROR_CLIENT);
+                listener.onVoiceStopped();
+                return;
+            }
             handler.postDelayed(restart, RESTART_DELAY_MS);
         }
     }
@@ -132,6 +147,12 @@ final class VoiceInput implements RecognitionListener {
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
         intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
         intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.getPackageName());
+        // Shorten the end-of-phrase wait; the defaults leave the strip silent
+        // for seconds after a sentence and look like a frozen microphone.
+        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+                1200);
+        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
+                900);
         return intent;
     }
 
@@ -225,12 +246,14 @@ final class VoiceInput implements RecognitionListener {
                 || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
                 || error == SpeechRecognizer.ERROR_CLIENT;
         if (recoverable) {
+            listener.onVoiceHint(error);
+            if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
+                    || error == SpeechRecognizer.ERROR_CLIENT) {
+                // These leave the instance unusable on several phones.
+                destroyRecognizer();
+            }
             if (continuous) {
-                if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
-                    destroyRecognizer();
-                }
                 handler.postDelayed(restart, RESTART_DELAY_MS);
-                listener.onVoiceListening();
                 return;
             }
             listener.onVoiceStopped();
@@ -247,6 +270,8 @@ final class VoiceInput implements RecognitionListener {
         if (!text.isEmpty()) {
             lastPartial = "";
             listener.onVoiceResult(text);
+        } else {
+            listener.onVoiceHint(SpeechRecognizer.ERROR_NO_MATCH);
         }
         if (wantListening && continuous) {
             handler.postDelayed(restart, RESULT_RESTART_MS);

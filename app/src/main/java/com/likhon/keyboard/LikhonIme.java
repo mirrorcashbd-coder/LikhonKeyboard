@@ -39,6 +39,7 @@ import java.util.Locale;
  */
 public class LikhonIme extends InputMethodService
         implements KeyboardView.Listener, VoiceInput.Listener,
+        VoiceSheetActivity.Callback,
         SharedPreferences.OnSharedPreferenceChangeListener {
 
     private KeyboardView keyboardView;
@@ -54,6 +55,13 @@ public class LikhonIme extends InputMethodService
     private boolean voicePreviewing;
     private View voiceLevel;
     private LinearLayout.LayoutParams voiceLevelParams;
+    /** Package of the editor that opened the voice sheet, so late text lands
+     *  back in the right app. */
+    private String sheetPackage;
+    private String pendingSheetText;
+    private String pendingSheetPackage;
+    private int voiceMisses;
+    private boolean voiceSheetHintShown;
 
     private Suggestions suggestions;
     private LearnedWords learned;
@@ -93,6 +101,7 @@ public class LikhonIme extends InputMethodService
 
     @Override
     public void onDestroy() {
+        VoiceSheetActivity.setCallback(null);
         if (voice != null) {
             voice.destroy();
             voice = null;
@@ -305,6 +314,7 @@ public class LikhonIme extends InputMethodService
             caps = (inputType & InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS) != 0 && !bangla;
         }
         enterLabel = resolveEnterLabel(attribute);
+        commitPendingSheet(attribute);
     }
 
     @Override
@@ -319,6 +329,7 @@ public class LikhonIme extends InputMethodService
         }
         refreshLayout();
         updateSuggestions();
+        commitPendingSheet(info);
     }
 
     @Override
@@ -772,6 +783,10 @@ public class LikhonIme extends InputMethodService
             startActivity(intent);
             return;
         }
+        if (prefs.voiceSheet()) {
+            startVoiceSheet();
+            return;
+        }
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
             Toast.makeText(this, R.string.voice_unavailable, Toast.LENGTH_LONG).show();
             return;
@@ -781,6 +796,8 @@ public class LikhonIme extends InputMethodService
         resetVoiceLevel();
         voicePreviewing = false;
         voiceListening = true;
+        voiceMisses = 0;
+        voiceSheetHintShown = false;
         keyboardView.setVoiceActive(true);
         voicePanel.setVisibility(View.VISIBLE);
         voiceStatus.setText(R.string.voice_listening);
@@ -789,6 +806,62 @@ public class LikhonIme extends InputMethodService
             voice = new VoiceInput(this, this);
         }
         voice.start(voiceLanguage(), prefs.voiceContinuous());
+    }
+
+    /**
+     * Opens the phone's own voice screen instead of the inline stream. The
+     * sentence is handed back after the editor regains focus.
+     */
+    private void startVoiceSheet() {
+        finishWord();
+        hideCandidates();
+        EditorInfo editor = getCurrentInputEditorInfo();
+        sheetPackage = editor == null ? null : editor.packageName;
+        VoiceSheetActivity.setCallback(this);
+        Intent intent = new Intent(this, VoiceSheetActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                | Intent.FLAG_ACTIVITY_NO_ANIMATION
+                | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
+        try {
+            startActivity(intent);
+        } catch (RuntimeException e) {
+            sheetPackage = null;
+            VoiceSheetActivity.setCallback(null);
+            Toast.makeText(this, R.string.voice_err_generic, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    @Override
+    public void onSheetText(String text) {
+        String target = sheetPackage;
+        sheetPackage = null;
+        if (text == null || text.trim().isEmpty()) {
+            return;
+        }
+        String converted = voiceText(text.trim());
+        if (converted.isEmpty()) {
+            return;
+        }
+        pendingSheetText = converted;
+        pendingSheetPackage = target;
+    }
+
+    /** Inserts a sentence that arrived while the editor was not focused. */
+    private void commitPendingSheet(EditorInfo info) {
+        if (pendingSheetText == null) {
+            return;
+        }
+        String text = pendingSheetText;
+        String expected = pendingSheetPackage;
+        String actual = info == null ? null : info.packageName;
+        pendingSheetText = null;
+        pendingSheetPackage = null;
+        if (expected != null && !expected.equals(actual)) {
+            // Another app took focus meanwhile; do not drop the words there.
+            return;
+        }
+        commit(text + " ");
+        learnSentence(text);
     }
 
     private void resetVoiceLevel() {
@@ -1035,11 +1108,7 @@ public class LikhonIme extends InputMethodService
         }
         voicePreviewing = false;
         commit(converted + " ");
-        if (learned != null) {
-            for (String word : converted.split("[\\s,.;:!?।]+")) {
-                learned.add(word, null);
-            }
-        }
+        learnSentence(converted);
         if (voiceStatus != null) {
             voiceStatus.setText(converted);
         }
@@ -1064,6 +1133,36 @@ public class LikhonIme extends InputMethodService
         }
         lastSuggestionKey = "";
         updateSuggestions();
+    }
+
+    @Override
+    public void onVoiceHint(int code) {
+        if (!voiceListening || voiceStatus == null) {
+            return;
+        }
+        if (code == SpeechRecognizer.ERROR_NO_MATCH
+                || code == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+            voiceMisses++;
+            if (voiceMisses >= 3 && !voiceSheetHintShown) {
+                voiceSheetHintShown = true;
+                Toast.makeText(this, R.string.voice_sheet_hint, Toast.LENGTH_LONG).show();
+            }
+        } else {
+            voiceMisses = 0;
+        }
+        voiceStatus.setText(voiceHintText(code));
+    }
+
+    private String voiceHintText(int code) {
+        if (code == SpeechRecognizer.ERROR_NO_MATCH
+                || code == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+            return getString(R.string.voice_heard_nothing);
+        }
+        if (code == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
+                || code == SpeechRecognizer.ERROR_CLIENT) {
+            return getString(R.string.voice_retrying);
+        }
+        return getString(R.string.voice_listening);
     }
 
     @Override
@@ -1243,6 +1342,18 @@ public class LikhonIme extends InputMethodService
         afterTyped(" ");
         lastSuggestionKey = "";
         updateSuggestions();
+    }
+
+    /** Every word of a dictated sentence becomes a suggestion for later. */
+    private void learnSentence(String text) {
+        if (learned == null || isSensitiveField()) {
+            return;
+        }
+        for (String word : text.split("[\\s,.;:!?।]+")) {
+            if (!word.isEmpty()) {
+                learned.add(word, null);
+            }
+        }
     }
 
     /** Letters (plus apostrophes) immediately before the cursor. */

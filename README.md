@@ -2,16 +2,18 @@
 
 A small, fast, **offline** Android keyboard with an English QWERTY layout and
 phonetic Bangla typing. Written in plain Java against the Android framework:
-no AndroidX, no third-party libraries, no internet permission, no ads.
+no AndroidX, no third-party libraries, no ads, and nothing of its own ever goes
+online (the `INTERNET` permission is declared only for speech services that run
+inside the calling app).
 
-**APK:** `build/manual/LikhonKeyboard-1.4.apk` (also copied to
-`/sdcard/Download/LikhonKeyboard-1.4.apk`)
+**APK:** `build/manual/LikhonKeyboard-1.5.apk` (also copied to
+`/sdcard/Download/LikhonKeyboard-1.5.apk`)
 
 ---
 
 ## Install
 
-1. Open `LikhonKeyboard-1.4.apk` in the Files app and allow "install unknown apps"
+1. Open `LikhonKeyboard-1.5.apk` in the Files app and allow "install unknown apps"
    for that app if asked.
 2. Open **Likhon Keyboard** from the app drawer.
 3. Tap **Enable keyboard** → turn on "Likhon Keyboard".
@@ -53,14 +55,29 @@ the keyboard to open settings at any time.
 - **Resizable keyboard**: drag the grip above the keys up or down to make the
   keyboard taller or shorter; long-press the grip to reset it.
 - English **and** Bangla UI (follows the phone language).
-- Typing and suggestions are fully offline. The only permission is the
+- Typing and suggestions are fully offline. The only runtime permission is the
   microphone, and it is used only while voice typing is running.
 
 ## Voice typing
 
 Tap the **microphone** key (bottom row of the letters and symbols pages) once.
-A strip appears above the keyboard: tap the microphone there to start and stop,
-or tap **×** to close it.
+
+There are two ways to dictate, switched in settings:
+
+- **Phone voice screen** (default): the speech screen your phone already has
+  opens — the same one other apps use. Speak, then the sentence is inserted
+  when you return to the app. The recogniser records from a foreground screen,
+  which is the path phones are most likely to allow.
+- **Inline strip**: turn the switch off. A strip appears above the keyboard
+  with the microphone, the language chip, a level bar and a **Stop** button,
+  and words appear as you speak.
+
+Settings also has a **Microphone check** (records 1.5 s and reports the level)
+and a **Speech service check** (runs one recognition and prints the result or
+the service's error name), so a silent microphone can be told apart from a
+speech service that refuses to answer.
+
+In inline mode:
 
 - Each tap on the language chip cycles **বাংলা → Banglish → English**.
   Bangla uses `bn-BD`, English uses `en-US`; Banglish listens in Bangla and then
@@ -83,8 +100,9 @@ or tap **×** to close it.
 Speech recognition is done by the speech service already on the phone (usually
 Google) — the same service Gboard uses for its Rambler voice typing. Bangla may
 need the Bangla language pack downloaded in that app, and some phones only do
-recognition online. The keyboard itself never sends anything anywhere and has
-no internet permission.
+recognition online. The keyboard itself never sends anything anywhere: the
+`INTERNET` permission exists only because some speech services run in the
+calling app and need it to reach their own servers.
 
 ## Word suggestions
 
@@ -182,7 +200,7 @@ equivalent ARM64 build script is included. It uses the Ubuntu/Debian
 tools/build-apk-arm64.sh
 ```
 
-Output: `build/manual/LikhonKeyboard-1.4.apk` (signed with the debug key in
+Output: `build/manual/LikhonKeyboard-1.5.apk` (signed with the debug key in
 `keystore/likhon-debug.jks`, generated on first run — keep that file if you want
 future builds to install over the current one).
 
@@ -231,6 +249,24 @@ finger (key, long-press timer, delete-repeat timer), which is what allows
 simultaneous presses.
 
 ## Changes
+
+**1.5**
+
+- Voice typing now works even on phones whose speech service ignores an input
+  method: the default path opens the phone's own voice screen and inserts the
+  sentence afterwards. The inline strip is still there as an option.
+- Fixed the Android 11+ package-visibility declaration for speech services
+  (`<queries>`), added `INTERNET` for recognisers that run in-process, shortened
+  the end-of-phrase wait, and recreate a recogniser that reports itself busy or
+  broken instead of retrying it forever.
+- The strip now says “nothing was heard — speak again” instead of silently
+  restarting, stops after three failed starts with a real error message, and
+  points to the voice-screen switch when nothing is recognised.
+- Settings gained **Microphone check** and **Speech service check**, which show
+  the peak microphone level and the speech service's own answer, so a blocked
+  microphone and a refusing recogniser can be told apart without a computer.
+- Dictated sentences are learned as suggestible words in one place, including
+  the sentences that arrive through the voice screen.
 
 **1.4**
 
@@ -282,6 +318,9 @@ simultaneous presses.
 - Voice typing depends on the phone's speech service; it does nothing if none
   is installed, and Bangla needs a Bangla language pack. It cannot use Gboard's
   private Rambler implementation directly.
+- The phone's voice screen is a separate screen: it hides the keyboard for a
+  moment and the text appears when you come back. The inline strip avoids that
+  but depends on the speech service accepting an input method as its caller.
 - Voice punctuation only recognises the listed words, and `period`/`colon`
   count as punctuation only at the end of a phrase (they are common nouns).
 - The custom keyboard view is not fully accessible to TalkBack; keys are not

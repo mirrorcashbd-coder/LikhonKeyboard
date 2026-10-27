@@ -45,7 +45,7 @@
 
     <string name="section_about">About</string>
     <string name="about_body">Likhon is a small, offline keyboard. It has no ads and never sends anything anywhere; the microphone is used only for voice typing. English is a standard QWERTY layout; Bangla is phonetic, so you type the sound in English letters.</string>
-    <string name="about_version">Version 1.4</string>
+    <string name="about_version">Version 1.5</string>
     <string name="footer">Offline · No ads · Optional microphone</string>
     <string name="about_guide">Bangla typing guide</string>
 
@@ -71,6 +71,10 @@
     <string name="voice_err_audio">The microphone could not be opened.</string>
     <string name="voice_err_language">Your phone’s speech service does not support Bangla yet.</string>
     <string name="voice_err_generic">Voice typing stopped unexpectedly. Try again.</string>
+    <string name="voice_heard_nothing">Nothing was heard — speak again</string>
+    <string name="voice_retrying">Restarting the microphone…</string>
+    <string name="voice_sheet_prompt">Speak now</string>
+    <string name="voice_sheet_hint">No words yet. In the mic settings, turn on “Use the phone’s voice screen”.</string>
 
     <string name="section_voice">Voice typing</string>
     <string name="section_voice_desc">Tap the mic key and speak: Bangla, Banglish or English.</string>
@@ -90,7 +94,22 @@
     <string name="opt_voice_continuous_desc">Starts again after every sentence until you tap Stop.</string>
     <string name="opt_voice_cleanup">Clean up speech</string>
     <string name="opt_voice_cleanup_desc">Removes “um”, “উম”, stutters and repeated words.</string>
+    <string name="opt_voice_sheet">Use the phone’s voice screen</string>
+    <string name="opt_voice_sheet_desc">Opens the speech screen your phone already provides. Turn this on if the inline microphone never writes any text.</string>
     <string name="voice_note">Recognition is done by your phone’s speech service (usually Google). Bangla may need a downloaded language or a connection; this app itself never goes online.</string>
+    <string name="mic_test_title">Microphone check</string>
+    <string name="mic_test_action">Test</string>
+    <string name="mic_test_running">Speak for a second…</string>
+    <string name="mic_test_ok">Microphone works (level %1$d).</string>
+    <string name="mic_test_silent">No sound reached the app (level %1$d). Allow the microphone for Likhon Keyboard in the phone settings.</string>
+    <string name="mic_test_failed">The microphone could not be opened.</string>
+    <string name="voice_test_title">Speech service check</string>
+    <string name="voice_test_action">Check</string>
+    <string name="voice_test_running">Listening for a few seconds…</string>
+    <string name="voice_test_ok">Speech service works: “%1$s”</string>
+    <string name="voice_test_empty">The speech service heard nothing.</string>
+    <string name="voice_test_failed">The speech service reported: %1$s</string>
+    <string name="voice_test_unavailable">No speech recognition service was found on this phone.</string>
     <string name="resize_hint">Drag to resize the keyboard</string>
     <string name="resize_reset">Keyboard size reset</string>
     <string name="suggestion_forgotten">Removed from suggestions</string>
