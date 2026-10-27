@@ -82,6 +82,8 @@ public class SettingsActivity extends Activity {
     private EditText shortcutValueInput;
     private LinearLayout shortcutList;
     private TextView learnedCount;
+    private LinearLayout languageChips;
+    private TextView languageNow;
     private SpeechRecognizer speechTest;
     private final Handler testHandler = new Handler(Looper.getMainLooper());
     private final Runnable speechTimeout = () ->
@@ -267,6 +269,62 @@ public class SettingsActivity extends Activity {
         }
     }
 
+    private void rebuildLanguageChips() {
+        if (languageChips == null) {
+            return;
+        }
+        Language current = Languages.byCode(prefs.language());
+        if (languageNow != null) {
+            languageNow.setText(getString(R.string.languages_now, current.nativeName,
+                    current.english));
+        }
+        languageChips.removeAllViews();
+        List<Language> all = Languages.all();
+        LinearLayout row = null;
+        for (int i = 0; i < all.size(); i++) {
+            if (i % 2 == 0) {
+                row = Ui.horizontal(this);
+                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT);
+                if (i > 0) {
+                    rowParams.topMargin = dp(8);
+                }
+                languageChips.addView(row, rowParams);
+            }
+            final Language language = all.get(i);
+            boolean enabled = prefs.languageEnabled(language.code);
+            boolean active = language.code.equals(current.code);
+            String label = language.nativeName + (enabled ? "  \u2713" : "");
+            TextView chip = makeChip(label, enabled, () -> {
+                boolean on = prefs.languageEnabled(language.code);
+                if (on && prefs.enabledLanguages().split(",").length <= 1) {
+                    Toast.makeText(this, R.string.languages_keep_one,
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                prefs.setLanguageEnabled(language.code, !on);
+                if (!on) {
+                    prefs.setLanguage(language.code);
+                }
+                rebuildLanguageChips();
+                updateLanguageChips();
+            });
+            chip.setTextSize(12);
+            chip.setSingleLine(true);
+            if (active) {
+                chip.setTextColor(palette.onAccent);
+                chip.setBackground(Ui.ripple(this, palette.accent, 12, 0x40FFFFFF));
+            }
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            if (i % 2 != 0) {
+                params.leftMargin = dp(8);
+            }
+            row.addView(chip, params);
+        }
+    }
+
     private void refreshLearnedCount() {
         if (learnedCount == null) {
             return;
@@ -410,13 +468,17 @@ public class SettingsActivity extends Activity {
         // ------------------------------------------------------- input card
         LinearLayout inputCard = Ui.card(this, palette);
         LinearLayout languageRow = Ui.horizontal(this);
-        chipEnglish = makeChip(getString(R.string.lang_english), !prefs.bangla(), () -> {
-            prefs.setBangla(false);
+        chipEnglish = makeChip(getString(R.string.lang_english), "en".equals(prefs.language()), () -> {
+            prefs.setLanguage("en");
+            prefs.setLanguageEnabled("en", true);
             updateLanguageChips();
+            rebuildLanguageChips();
         });
-        chipBangla = makeChip(getString(R.string.lang_bangla), prefs.bangla(), () -> {
-            prefs.setBangla(true);
+        chipBangla = makeChip(getString(R.string.lang_bangla), "bn".equals(prefs.language()), () -> {
+            prefs.setLanguage("bn");
+            prefs.setLanguageEnabled("bn", true);
             updateLanguageChips();
+            rebuildLanguageChips();
         });
         LinearLayout.LayoutParams chipFirst = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
@@ -425,6 +487,17 @@ public class SettingsActivity extends Activity {
         languageRow.addView(chipBangla, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         inputCard.addView(languageRow);
+
+        // ------------------------------------------------------ languages card
+        LinearLayout langCard = Ui.card(this, palette);
+        languageNow = Ui.text(this, "", 13, palette.text, true);
+        langCard.addView(languageNow);
+        langCard.addView(Ui.text(this, getString(R.string.languages_desc), 12,
+                palette.textMuted, false));
+        languageChips = Ui.vertical(this);
+        addWithTopMargin(langCard, languageChips, 10);
+        addSection(root, getString(R.string.section_languages), null, langCard);
+        rebuildLanguageChips();
 
         TextView languageHint = Ui.text(this, getString(R.string.lang_hint), 12,
                 palette.textMuted, false);
@@ -665,9 +738,9 @@ public class SettingsActivity extends Activity {
     }
 
     private void updateLanguageChips() {
-        boolean bangla = prefs.bangla();
-        styleChip(chipEnglish, !bangla);
-        styleChip(chipBangla, bangla);
+        String code = prefs.language();
+        styleChip(chipEnglish, "en".equals(code));
+        styleChip(chipBangla, "bn".equals(code));
     }
 
     private void styleChip(TextView chip, boolean selected) {

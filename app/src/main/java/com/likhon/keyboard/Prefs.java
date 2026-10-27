@@ -10,6 +10,8 @@ final class Prefs {
     static final String FILE = "likhon_prefs";
 
     static final String KEY_BANGLA = "default_bangla";
+    static final String KEY_LANGUAGE = "language";
+    static final String KEY_LANGS = "enabled_langs";
     static final String KEY_THEME = "theme";
     static final String KEY_HAPTIC = "haptic";
     static final String KEY_SOUND = "sound";
@@ -63,7 +65,73 @@ final class Prefs {
     }
 
     void setBangla(boolean value) {
-        sp.edit().putBoolean(KEY_BANGLA, value).apply();
+        sp.edit()
+                .putBoolean(KEY_BANGLA, value)
+                .putString(KEY_LANGUAGE, value ? "bn" : "en")
+                .apply();
+    }
+
+    /** Current language code, e.g. en, bn, hi, ar. */
+    String language() {
+        String code = sp.getString(KEY_LANGUAGE, "");
+        if (code == null || code.isEmpty()) {
+            return bangla() ? "bn" : "en";
+        }
+        return code;
+    }
+
+    void setLanguage(String code) {
+        sp.edit()
+                .putString(KEY_LANGUAGE, code)
+                .putBoolean(KEY_BANGLA, "bn".equals(code))
+                .apply();
+    }
+
+    /** Comma separated codes the language key cycles through. */
+    String enabledLanguages() {
+        String value = sp.getString(KEY_LANGS, "");
+        if (value == null || value.trim().isEmpty()) {
+            return "en,bn";
+        }
+        return value;
+    }
+
+    void setEnabledLanguages(String csv) {
+        sp.edit().putString(KEY_LANGS, csv).apply();
+    }
+
+    boolean languageEnabled(String code) {
+        for (String part : enabledLanguages().split(",")) {
+            if (part.trim().equals(code)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Enables or disables one language, always keeping at least one. */
+    void setLanguageEnabled(String code, boolean on) {
+        StringBuilder out = new StringBuilder();
+        java.util.LinkedHashSet<String> codes = new java.util.LinkedHashSet<>();
+        for (String part : enabledLanguages().split(",")) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty() && !trimmed.equals(code)) {
+                codes.add(trimmed);
+            }
+        }
+        if (on) {
+            codes.add(code);
+        }
+        if (codes.isEmpty()) {
+            codes.add("en");
+        }
+        for (String value : codes) {
+            if (out.length() > 0) {
+                out.append(',');
+            }
+            out.append(value);
+        }
+        setEnabledLanguages(out.toString());
     }
 
     int theme() {

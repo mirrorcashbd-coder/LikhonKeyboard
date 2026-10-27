@@ -131,6 +131,7 @@ public class LikhonIme extends InputMethodService
         return Math.min(MAX_SUGGESTIONS, prefs.suggestionCount());
     }
 
+    private Language language = Languages.byCode("en");
     private boolean bangla;
     private boolean shift;
     private boolean caps;
@@ -151,7 +152,8 @@ public class LikhonIme extends InputMethodService
     public void onCreate() {
         super.onCreate();
         prefs = new Prefs(this);
-        bangla = prefs.bangla();
+        language = Languages.byCode(prefs.language());
+        bangla = language.isPhoneticBangla();
         palette = Palette.resolve(this, prefs.theme(), prefs.accent());
         prefs.register(this);
         uiHandler = new Handler(Looper.getMainLooper());
@@ -576,15 +578,15 @@ public class LikhonIme extends InputMethodService
         if (keyboardView == null) {
             return;
         }
-        String spaceLabel = bangla ? "বাংলা" : "English";
-        String signature = page + "|" + bangla + "|" + shift + "|" + caps + "|"
+        String spaceLabel = language.spaceLabel;
+        String signature = page + "|" + language.code + "|" + shift + "|" + caps + "|"
                 + prefs.hints() + "|" + prefs.numberRow() + "|" + enterLabel + "|"
                 + emojiPage + "|" + numeric;
         if (signature.equals(builtSignature)) {
             return;
         }
         builtSignature = signature;
-        List<Layouts.Row> rows = Layouts.build(page, bangla, shift, caps, prefs.hints(),
+        List<Layouts.Row> rows = Layouts.build(page, language, shift, caps, prefs.hints(),
                 prefs.numberRow(), enterLabel, spaceLabel, emojiPage);
         keyboardView.setKeys(rows);
     }
@@ -811,15 +813,20 @@ public class LikhonIme extends InputMethodService
 
     private void toggleLanguage() {
         finishWord();
-        bangla = !bangla;
-        prefs.setBangla(bangla);
+        rawWord.setLength(0);
+        composing = false;
+        language = Languages.next(language.code, prefs.enabledLanguages());
+        prefs.setLanguage(language.code);
+        bangla = language.isPhoneticBangla();
         shift = false;
         caps = false;
         page = numeric ? Layouts.PAGE_NUMERIC : Layouts.PAGE_LETTERS;
         emojiPage = 0;
+        hideCandidates();
         refreshLayout();
         lastSuggestionKey = "";
         updateSuggestions();
+        Toast.makeText(this, language.nativeName, Toast.LENGTH_SHORT).show();
     }
 
     private void afterTyped(String text) {
@@ -827,7 +834,7 @@ public class LikhonIme extends InputMethodService
             return;
         }
         char last = text.charAt(text.length() - 1);
-        if (!bangla) {
+        if (!bangla && language.hasCase()) {
             if (prefs.autoCap() && isSentenceEnd(last)) {
                 shift = true;
             } else if (!(text.equals(" ") && shift) && shift && !caps) {
@@ -878,7 +885,8 @@ public class LikhonIme extends InputMethodService
 
     /** Adds the word just finished to the learned list. */
     private void learnCurrentWord() {
-        if (learned == null || isSensitiveField() || prefs.incognito()) {
+        if (learned == null || isSensitiveField() || prefs.incognito()
+                || !language.suggests()) {
             return;
         }
         if (bangla && composing) {
@@ -2324,7 +2332,7 @@ public class LikhonIme extends InputMethodService
             return;
         }
         boolean typingPage = page == Layouts.PAGE_LETTERS || page == Layouts.PAGE_SYMBOLS;
-        if (numeric || !typingPage || isSensitiveField()) {
+        if (numeric || !typingPage || isSensitiveField() || !language.suggests()) {
             hideCandidates();
             return;
         }
@@ -2471,7 +2479,8 @@ public class LikhonIme extends InputMethodService
 
     /** Every word of a dictated sentence becomes a suggestion for later. */
     private void learnSentence(String text) {
-        if (learned == null || isSensitiveField() || prefs.incognito()) {
+        if (learned == null || isSensitiveField() || prefs.incognito()
+                || !language.suggests()) {
             return;
         }
         for (String word : text.split("[\\s,.;:!?।]+")) {
@@ -2529,12 +2538,23 @@ public class LikhonIme extends InputMethodService
         if (keyboardView == null || prefs == null) {
             return;
         }
-        if (Prefs.KEY_BANGLA.equals(key)) {
-            boolean wanted = prefs.bangla();
-            if (wanted != bangla && !composing) {
-                bangla = wanted;
+        if (Prefs.KEY_LANGUAGE.equals(key) || Prefs.KEY_BANGLA.equals(key)
+                || Prefs.KEY_LANGS.equals(key)) {
+            Language wanted = Languages.byCode(prefs.language());
+            if (!wanted.code.equals(language.code)) {
+                finishWord();
+                composing = false;
+                rawWord.setLength(0);
+                language = wanted;
+                bangla = wanted.isPhoneticBangla();
+                shift = false;
+                caps = false;
                 page = numeric ? Layouts.PAGE_NUMERIC : Layouts.PAGE_LETTERS;
+                builtSignature = null;
                 refreshLayout();
+                hideCandidates();
+                lastSuggestionKey = "";
+                updateSuggestions();
             }
             return;
         }

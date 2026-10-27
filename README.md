@@ -339,6 +339,28 @@ the toolbar above the suggestions.
 translate; incognito stops learning and clipboard capture; reset-all returns
 every setting to its default without touching the clipboard.
 
+## Languages
+
+39 keyboard languages ship in the APK, all built from the same code-driven
+layout engine:
+
+- **Bangla** — phonetic (avro-style: `ami` → আমি) and a direct script layout
+  with the full alphabet, all matras, ৎ ং ঃ ঁ ্ ড় ঢ় য় and ৳.
+- **Script keyboards** — Hindi, Arabic, Urdu, Persian, Russian, Ukrainian,
+  Greek, Hebrew, Thai, Tamil, Telugu, Kannada, Malayalam, Gujarati, Punjabi,
+  Odia, Sinhala. Each has its own three rows plus a shifted row for matras,
+  signs and extra letters.
+- **Latin keyboards** — English, Spanish, French (AZERTY), German (QWERTZ),
+  Portuguese, Italian, Dutch, Turkish, Polish, Czech, Romanian, Swedish,
+  Norwegian, Danish, Finnish, Vietnamese, Indonesian, Malay, Filipino,
+  Kiswahili, each with its own accented letters.
+
+Enable any number of them in **Settings → Languages**; the globe key on the
+keyboard cycles through the enabled ones and shows the language name. Chinese,
+Japanese and Korean *character* input needs a dictionary engine (pinyin,
+romaji, hangul assembly) and is not claimed: those languages need a real IME
+engine, not a key map.
+
 ## Libraries
 
 The keyboard is built only against the Android framework (org.json,
@@ -357,6 +379,18 @@ with the current theme. Every tap plays a short squash-and-settle animation and
 undo/redo pivot to show the way the history moved.
 
 ## Changes
+
+**1.13**
+
+- 39 keyboard languages: phonetic and direct-script Bangla, 17 more script
+  keyboards (Hindi, Arabic, Urdu, Persian, Russian, Ukrainian, Greek, Hebrew,
+  Thai, Tamil, Telugu, Kannada, Malayalam, Gujarati, Punjabi, Odia, Sinhala)
+  and 20 Latin keyboards with their own accented letters (AZERTY, QWERTZ and
+  Turkish layouts included).
+- Language manager in the settings; the globe key cycles the enabled
+  languages and shows the name; suggestions stay on where a dictionary exists.
+- Shift switches to the shifted script row (matras, signs) and to capitals on
+  Latin keyboards.
 
 **1.12**
 

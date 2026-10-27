@@ -44,26 +44,26 @@ final class Layouts {
     private Layouts() {
     }
 
-    static List<Row> build(int page, boolean bangla, boolean shift, boolean caps, boolean hints,
+    static List<Row> build(int page, Language lang, boolean shift, boolean caps, boolean hints,
                            boolean numberRow, String enterLabel, String spaceLabel, int emojiPage) {
         switch (page) {
             case PAGE_SYMBOLS:
-                return symbols(bangla, enterLabel, spaceLabel, false);
+                return symbols(lang, enterLabel, spaceLabel, false);
             case PAGE_MORE:
-                return symbols(bangla, enterLabel, spaceLabel, true);
+                return symbols(lang, enterLabel, spaceLabel, true);
             case PAGE_EMOJI:
                 return emoji(emojiPage, spaceLabel, enterLabel);
             case PAGE_NUMERIC:
                 return numeric(enterLabel, spaceLabel);
             case PAGE_LETTERS:
             default:
-                return letters(bangla, shift, caps, hints, numberRow, enterLabel, spaceLabel);
+                return letters(lang, shift, caps, hints, numberRow, enterLabel, spaceLabel);
         }
     }
 
     // ------------------------------------------------------------------ letters
 
-    private static List<Row> letters(boolean bangla, boolean shift, boolean caps, boolean hints,
+    private static List<Row> letters(Language lang, boolean shift, boolean caps, boolean hints,
                                      boolean numberRow, String enterLabel, String spaceLabel) {
         List<Row> rows = new ArrayList<>(5);
         if (numberRow) {
@@ -73,25 +73,56 @@ final class Layouts {
                     Key.ch("9", 1f), Key.ch("0", 1f)));
         }
 
-        rows.add(new Row(0f, letterRow(ROW1, 0, shift, bangla, hints)));
-        rows.add(new Row(0.5f, letterRow(ROW2, 10, shift, bangla, hints)));
+        boolean banglaPhonetic = lang.isPhoneticBangla();
+        if (lang.usesOwnLetters()) {
+            rows.add(new Row(0f, scriptRow(lang, 0, shift)));
+            rows.add(new Row(0.3f, scriptRow(lang, 1, shift)));
 
-        Key[] third = new Key[9];
-        third[0] = Key.special(Key.SHIFT, caps ? "caps" : "shift", 1.5f, shift || caps);
-        Key[] rest = letterRow(ROW3, 19, shift, bangla, hints);
-        System.arraycopy(rest, 0, third, 1, rest.length);
-        third[8] = Key.special(Key.DELETE, "delete", 1.5f, false);
-        rows.add(new Row(0f, third));
+            String[] third = lang.row(2, shift);
+            Key[] keys = new Key[third.length + 2];
+            keys[0] = Key.special(Key.SHIFT, caps ? "caps" : "shift", 1.3f, shift || caps);
+            for (int i = 0; i < third.length; i++) {
+                keys[i + 1] = Key.ch(cased(lang, third[i], shift), 1f);
+            }
+            keys[keys.length - 1] = Key.special(Key.DELETE, "delete", 1.3f, false);
+            rows.add(new Row(0f, keys));
+        } else {
+            rows.add(new Row(0f, letterRow(ROW1, 0, shift, banglaPhonetic, hints)));
+            rows.add(new Row(0.5f, letterRow(ROW2, 10, shift, banglaPhonetic, hints)));
 
+            Key[] third = new Key[9];
+            third[0] = Key.special(Key.SHIFT, caps ? "caps" : "shift", 1.5f, shift || caps);
+            Key[] rest = letterRow(ROW3, 19, shift, banglaPhonetic, hints);
+            System.arraycopy(rest, 0, third, 1, rest.length);
+            third[8] = Key.special(Key.DELETE, "delete", 1.5f, false);
+            rows.add(new Row(0f, third));
+        }
+
+        String period = "bn_bd".equals(lang.code) ? "।" : ".";
         rows.add(new Row(0f,
                 Key.special(Key.SYMBOLS, "?123", 1.3f, false),
-                Key.special(Key.LANGUAGE, bangla ? "বাংলা" : "EN", 1.3f, bangla),
+                Key.special(Key.LANGUAGE, lang.shortLabel, 1.3f, !"en".equals(lang.code)),
                 Key.ch(",", 0.85f),
                 Key.special(Key.SPACE, spaceLabel, 3.3f, false),
-                Key.ch(".", 0.85f),
+                Key.ch(period, 0.85f),
                 Key.special(Key.MIC, "mic", 0.9f, false),
                 enterKey(enterLabel, 1.3f)));
         return rows;
+    }
+
+    /** One row of a script language: every character is its own key. */
+    private static Key[] scriptRow(Language lang, int index, boolean shift) {
+        String[] letters = lang.row(index, shift);
+        Key[] keys = new Key[letters.length];
+        for (int i = 0; i < letters.length; i++) {
+            keys[i] = Key.ch(cased(lang, letters[i], shift), 1f);
+        }
+        return keys;
+    }
+
+    /** Latin languages have no shifted rows: shift simply upper-cases. */
+    private static String cased(Language lang, String text, boolean shift) {
+        return shift && lang.hasCase() ? text.toUpperCase() : text;
     }
 
     private static Key[] letterRow(String[] letters, int hintOffset, boolean shift,
@@ -111,7 +142,8 @@ final class Layouts {
 
     // ------------------------------------------------------------------ symbols
 
-    private static List<Row> symbols(boolean bangla, String enterLabel, String spaceLabel, boolean more) {
+    private static List<Row> symbols(Language lang, String enterLabel, String spaceLabel, boolean more) {
+        boolean bangla = lang.code.startsWith("bn");
         List<Row> rows = new ArrayList<>(4);
         if (!more) {
             rows.add(new Row(0f,
@@ -139,14 +171,14 @@ final class Layouts {
                     Key.ch("[", 1f), Key.ch("]", 1f), Key.ch("<", 1f), Key.ch(">", 1f),
                     Key.special(Key.DELETE, "delete", 1.5f, false)));
         }
-        rows.add(symbolBottom(bangla, enterLabel, spaceLabel));
+        rows.add(symbolBottom(lang, enterLabel, spaceLabel));
         return rows;
     }
 
-    private static Row symbolBottom(boolean bangla, String enterLabel, String spaceLabel) {
+    private static Row symbolBottom(Language lang, String enterLabel, String spaceLabel) {
         return new Row(0f,
                 Key.special(Key.LETTERS, "ABC", 1.4f, false),
-                Key.special(Key.LANGUAGE, bangla ? "বাংলা" : "EN", 1.4f, bangla),
+                Key.special(Key.LANGUAGE, lang.shortLabel, 1.4f, !"en".equals(lang.code)),
                 Key.special(Key.EMOJI, "emoji", 0.9f, false),
                 Key.special(Key.SPACE, spaceLabel, 3.3f, false),
                 Key.ch(",", 0.9f),

@@ -45,7 +45,7 @@
 
     <string name="section_about">সম্পর্কে</string>
     <string name="about_body">লিখন একটি ছোট, অফলাইন কীবোর্ড। এতে বিজ্ঞাপন নেই এবং কোথাও কিছু পাঠায় না; মাইক্রোফোন কেবল ভয়েস টাইপিংয়ে ব্যবহার হয়। ইংরেজি সাধারণ QWERTY লেআউট; বাংলা ফোনেটিক, অর্থাৎ ইংরেজি অক্ষরে যেভাবে উচ্চারণ হয় সেভাবে লিখলেই বাংলা হয়।</string>
-    <string name="about_version">সংস্করণ ১.১২</string>
+    <string name="about_version">সংস্করণ ১.১৩</string>
     <string name="footer">অফলাইন · বিজ্ঞাপন নেই · মাইক অনুমতি ঐচ্ছিক</string>
     <string name="about_guide">বাংলা টাইপিং নির্দেশিকা</string>
 
@@ -226,4 +226,8 @@
     <string name="incognito_state_off">ইনকগনিটো: বন্ধ</string>
     <string name="clip_filter_all">সব</string>
     <string name="clip_filter_pinned">পিন করা</string>
+    <string name="section_languages">ভাষা</string>
+    <string name="languages_desc">ভাষার নামে চাপ দিলে সেটি চালু হবে। কীবোর্ডের গ্লোব কী চালু ভাষাগুলোর মধ্যে পালা করে বদলায়।</string>
+    <string name="languages_now">এখন লিখছেন: %1$s (%2$s)</string>
+    <string name="languages_keep_one">অন্তত একটি ভাষা চালু রাখুন</string>
 </resources>
