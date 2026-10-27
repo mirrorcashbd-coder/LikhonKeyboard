@@ -105,6 +105,11 @@ final class LearnedIndex {
         return entries.size();
     }
 
+    /** Forgets everything; used from the settings screen. */
+    void clear() {
+        entries.clear();
+    }
+
     /** Most recent first: {@code key \t word \t count}. */
     List<String> toLines() {
         List<String> lines = new ArrayList<>(entries.size());

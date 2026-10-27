@@ -25,6 +25,7 @@ import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.text.InputType;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
@@ -40,6 +41,7 @@ import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Setup + settings screen. Deliberately one short screen: enable the keyboard,
@@ -76,6 +78,10 @@ public class SettingsActivity extends Activity {
     private TextView voiceTestResult;
     private TextView voiceLogView;
     private TextView clipStoreCount;
+    private EditText shortcutKeyInput;
+    private EditText shortcutValueInput;
+    private LinearLayout shortcutList;
+    private TextView learnedCount;
     private SpeechRecognizer speechTest;
     private final Handler testHandler = new Handler(Looper.getMainLooper());
     private final Runnable speechTimeout = () ->
@@ -84,7 +90,7 @@ public class SettingsActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         prefs = new Prefs(this);
-        palette = Palette.resolve(this, prefs.theme());
+        palette = Palette.resolve(this, prefs.theme(), prefs.accent());
         setTheme(palette.dark ? R.style.Theme_Likhon_Dark : R.style.Theme_Likhon_Light);
         super.onCreate(savedInstanceState);
         configureWindow();
@@ -127,6 +133,168 @@ public class SettingsActivity extends Activity {
                 .setPositiveButton(R.string.clip_clear, (dialog, which) -> {
                     store.clear();
                     refreshClipStore();
+                })
+                .show();
+    }
+
+    // ------------------------------------------------------- new settings bits
+
+    private interface IntAction {
+        void run(int value);
+    }
+
+    private void addAccentChips(LinearLayout parent) {
+        LinearLayout holder = Ui.vertical(this);
+        LinearLayout row = null;
+        for (int i = 0; i < Palette.accentCount(); i++) {
+            if (i % 3 == 0) {
+                row = Ui.horizontal(this);
+                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT);
+                if (i > 0) {
+                    rowParams.topMargin = dp(8);
+                }
+                holder.addView(row, rowParams);
+            }
+            final int index = i;
+            boolean selected = prefs.accent() == i;
+            int color = Palette.accentColor(i, palette.dark);
+            TextView chip = Ui.text(this, selected ? "\u2713" : "", 15,
+                    palette.dark ? 0xFF0A0E13 : 0xFFFFFFFF, true);
+            chip.setGravity(Gravity.CENTER);
+            chip.setPadding(0, dp(12), 0, dp(12));
+            chip.setBackground(Ui.ripple(this, color, 12, 0x55FFFFFF));
+            chip.setClickable(true);
+            chip.setOnClickListener(v -> {
+                prefs.raw().edit().putInt(Prefs.KEY_ACCENT, index).apply();
+                recreate();
+            });
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            if (i % 3 != 0) {
+                params.leftMargin = dp(8);
+            }
+            row.addView(chip, params);
+        }
+        addWithTopMargin(parent, holder, 10);
+    }
+
+    private void addChipGrid(LinearLayout parent, String[] labels, int selected,
+                             IntAction action, int perRow, int topMarginDp) {
+        LinearLayout holder = Ui.vertical(this);
+        LinearLayout row = null;
+        for (int i = 0; i < labels.length; i++) {
+            if (i % perRow == 0) {
+                row = Ui.horizontal(this);
+                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT);
+                if (i > 0) {
+                    rowParams.topMargin = dp(8);
+                }
+                holder.addView(row, rowParams);
+            }
+            final int value = i;
+            TextView chip = makeChip(labels[i], selected == i, () -> action.run(value));
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            if (i % perRow != 0) {
+                params.leftMargin = dp(8);
+            }
+            row.addView(chip, params);
+        }
+        addWithTopMargin(parent, holder, Math.max(0, topMarginDp));
+    }
+
+    private EditText smallField(String hint) {
+        EditText field = new EditText(this);
+        field.setTextSize(13);
+        field.setTextColor(palette.text);
+        field.setHintTextColor(palette.textMuted);
+        field.setHint(hint);
+        field.setSingleLine(true);
+        field.setInputType(InputType.TYPE_CLASS_TEXT);
+        field.setBackground(Ui.roundedStroke(this, palette.surfaceAlt, 10, palette.divider, 1));
+        field.setPadding(dp(10), dp(8), dp(10), dp(8));
+        return field;
+    }
+
+    private void addShortcut() {
+        if (shortcutKeyInput == null || shortcutValueInput == null) {
+            return;
+        }
+        String key = shortcutKeyInput.getText().toString().trim();
+        String value = shortcutValueInput.getText().toString().trim();
+        if (key.isEmpty() || value.isEmpty()) {
+            Toast.makeText(this, R.string.shortcuts_need_both, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        new Shortcuts(this).put(key, value);
+        shortcutKeyInput.setText("");
+        shortcutValueInput.setText("");
+        rebuildShortcutList();
+    }
+
+    private void rebuildShortcutList() {
+        if (shortcutList == null) {
+            return;
+        }
+        shortcutList.removeAllViews();
+        Map<String, String> map = new Shortcuts(this).all();
+        if (map.isEmpty()) {
+            shortcutList.addView(Ui.text(this, getString(R.string.shortcuts_empty), 12,
+                    palette.textMuted, false));
+            return;
+        }
+        for (Map.Entry<String, String> entry : map.entrySet()) {
+            LinearLayout row = Ui.horizontal(this);
+            TextView text = Ui.text(this, entry.getKey() + "  \u2192  " + entry.getValue(),
+                    13, palette.text, false);
+            text.setLayoutParams(new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            text.setSingleLine(true);
+            text.setEllipsize(TextUtils.TruncateAt.END);
+            row.addView(text);
+            TextView delete = Ui.text(this, "\u2715", 14, palette.textMuted, true);
+            delete.setPadding(dp(10), dp(6), dp(4), dp(6));
+            delete.setOnClickListener(v -> {
+                new Shortcuts(this).remove(entry.getKey());
+                rebuildShortcutList();
+            });
+            row.addView(delete);
+            addWithTopMargin(shortcutList, row, 6);
+        }
+    }
+
+    private void refreshLearnedCount() {
+        if (learnedCount == null) {
+            return;
+        }
+        int count = new LearnedWords(this).size();
+        learnedCount.setText(getString(R.string.learned_count, count));
+    }
+
+    private void confirmClearLearned() {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.section_learned)
+                .setMessage(R.string.learned_clear_confirm)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.learned_clear, (dialog, which) -> {
+                    new LearnedWords(this).clear();
+                    refreshLearnedCount();
+                })
+                .show();
+    }
+
+    private void confirmResetAll() {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.reset_all)
+                .setMessage(R.string.reset_all_confirm)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.reset_all, (dialog, which) -> {
+                    prefs.raw().edit().clear().apply();
+                    recreate();
                 })
                 .show();
     }
@@ -293,10 +461,81 @@ public class SettingsActivity extends Activity {
         addSection(root, getString(R.string.settings_clipboard), null, clipCard);
         refreshClipStore();
 
+        // ---------------------------------------------------- shortcuts card
+        LinearLayout shortcutCard = Ui.card(this, palette);
+        shortcutCard.addView(Ui.text(this, getString(R.string.shortcuts_desc), 13,
+                palette.textMuted, false));
+        LinearLayout shortcutRow = Ui.horizontal(this);
+        shortcutKeyInput = smallField(getString(R.string.shortcuts_key_hint));
+        shortcutValueInput = smallField(getString(R.string.shortcuts_value_hint));
+        LinearLayout.LayoutParams keyParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        shortcutKeyInput.setLayoutParams(keyParams);
+        LinearLayout.LayoutParams valueParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 2f);
+        valueParams.leftMargin = dp(8);
+        shortcutValueInput.setLayoutParams(valueParams);
+        shortcutRow.addView(shortcutKeyInput);
+        shortcutRow.addView(shortcutValueInput);
+        shortcutRow.addView(Ui.button(this, palette,
+                getString(R.string.shortcuts_add), true, this::addShortcut));
+        addWithTopMargin(shortcutCard, shortcutRow, 12);
+        shortcutList = Ui.vertical(this);
+        addWithTopMargin(shortcutCard, shortcutList, 12);
+        addSection(root, getString(R.string.section_shortcuts), null, shortcutCard);
+        rebuildShortcutList();
+
+        // ------------------------------------------------- learned words card
+        LinearLayout learnedCard = Ui.card(this, palette);
+        LinearLayout learnedRow = Ui.horizontal(this);
+        learnedCount = Ui.text(this, "", 13, palette.text, true);
+        learnedCount.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        learnedRow.addView(learnedCount);
+        learnedRow.addView(Ui.button(this, palette, getString(R.string.learned_clear),
+                false, this::confirmClearLearned));
+        learnedCard.addView(learnedRow);
+        learnedCard.addView(Ui.text(this, getString(R.string.learned_desc), 12,
+                palette.textMuted, false));
+        addSection(root, getString(R.string.section_learned), null, learnedCard);
+        refreshLearnedCount();
+
         // -------------------------------------------------- appearance card
         LinearLayout themeCard = Ui.card(this, palette);
         themeChips = Ui.horizontal(this);
         themeCard.addView(themeChips);
+
+        TextView accentLabel = Ui.text(this, getString(R.string.accent), 13,
+                palette.text, true);
+        themeCard.addView(accentLabel);
+        addAccentChips(themeCard);
+
+        TextView shapeLabel = Ui.text(this, getString(R.string.key_shape), 13,
+                palette.text, true);
+        shapeLabel.setPadding(0, dp(18), 0, dp(8));
+        themeCard.addView(shapeLabel);
+        addChipGrid(themeCard, new String[]{
+                getString(R.string.shape_square),
+                getString(R.string.shape_rounded),
+                getString(R.string.shape_pill)}, prefs.keyShape(), value -> {
+            prefs.setKeyShape(value);
+            recreate();
+        }, 3, 0);
+
+        TextView sizeLabel = Ui.text(this, getString(R.string.label_size), 13,
+                palette.text, true);
+        sizeLabel.setPadding(0, dp(18), 0, dp(8));
+        themeCard.addView(sizeLabel);
+        addChipGrid(themeCard, new String[]{
+                getString(R.string.size_small),
+                getString(R.string.size_normal),
+                getString(R.string.size_large)}, prefs.labelSize(), value -> {
+            prefs.setLabelSize(value);
+            recreate();
+        }, 3, 0);
+
+        addSwitchRow(themeCard, R.string.opt_borders, R.string.opt_borders_desc,
+                Prefs.KEY_KEY_BORDERS, prefs.keyBorders());
         addSection(root, getString(R.string.section_appearance), null, themeCard);
         rebuildThemeChips();
 
@@ -316,6 +555,34 @@ public class SettingsActivity extends Activity {
                 Prefs.KEY_NUMBER_ROW, prefs.numberRow());
         addSwitchRow(typingCard, R.string.opt_double_space, R.string.opt_double_space_desc,
                 Prefs.KEY_DOUBLE_SPACE, prefs.doubleSpace());
+        addSwitchRow(typingCard, R.string.opt_suggestions, R.string.opt_suggestions_desc,
+                Prefs.KEY_SUGGESTIONS, prefs.suggestionsEnabled());
+        addSwitchRow(typingCard, R.string.opt_incognito, R.string.opt_incognito_desc,
+                Prefs.KEY_INCOGNITO, prefs.incognito());
+
+        TextView countLabel = Ui.text(this, getString(R.string.suggestion_count), 13,
+                palette.text, true);
+        countLabel.setPadding(0, dp(18), 0, dp(8));
+        typingCard.addView(countLabel);
+        addChipGrid(typingCard, new String[]{"4", "6", "8"}, prefs.suggestionCount() == 4
+                ? 0 : (prefs.suggestionCount() == 8 ? 2 : 1), value -> {
+            prefs.setSuggestionCount(value == 0 ? 4 : (value == 2 ? 8 : 6));
+            recreate();
+        }, 3, 0);
+
+        TextView heightPreset = Ui.text(this, getString(R.string.height_preset), 13,
+                palette.text, true);
+        heightPreset.setPadding(0, dp(18), 0, dp(8));
+        typingCard.addView(heightPreset);
+        float scale = prefs.heightScale();
+        int preset = scale < 0.94f ? 0 : (scale > 1.06f ? 2 : 1);
+        addChipGrid(typingCard, new String[]{
+                getString(R.string.size_compact),
+                getString(R.string.size_normal),
+                getString(R.string.size_tall)}, preset, value -> {
+            prefs.setHeightScale(value == 0 ? 0.88f : (value == 2 ? 1.14f : 1f));
+            Toast.makeText(this, R.string.height_applied, Toast.LENGTH_SHORT).show();
+        }, 3, 0);
 
         LinearLayout heightRow = Ui.horizontal(this);
         TextView heightLabel = Ui.text(this, getString(R.string.reset_height), 13,
@@ -340,6 +607,16 @@ public class SettingsActivity extends Activity {
         guide.setBackground(Ui.ripple(this, Color.TRANSPARENT, 10, palette.keyStroke));
         guide.setOnClickListener(v -> showGuide());
         aboutCard.addView(guide);
+
+        LinearLayout resetRow = Ui.horizontal(this);
+        TextView resetLabel = Ui.text(this, getString(R.string.reset_all), 13,
+                palette.text, true);
+        resetLabel.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        resetRow.addView(resetLabel);
+        resetRow.addView(Ui.button(this, palette, getString(R.string.reset_all), false,
+                this::confirmResetAll));
+        addWithTopMargin(aboutCard, resetRow, 18);
 
         TextView version = Ui.text(this, getString(R.string.about_version) + "  ·  "
                 + getString(R.string.footer), 12, palette.textMuted, false);
@@ -490,6 +767,8 @@ public class SettingsActivity extends Activity {
                 Prefs.KEY_VOICE_CONTINUOUS, prefs.voiceContinuous());
         addSwitchRow(card, R.string.opt_voice_cleanup, R.string.opt_voice_cleanup_desc,
                 Prefs.KEY_VOICE_CLEANUP, prefs.voiceCleanup());
+        addSwitchRow(card, R.string.opt_voice_trailing, R.string.opt_voice_trailing_desc,
+                Prefs.KEY_VOICE_TRAILING, prefs.voiceTrailingSpace());
 
         LinearLayout micRow = Ui.horizontal(this);
         TextView micLabel = Ui.text(this, getString(R.string.mic_test_title), 13,

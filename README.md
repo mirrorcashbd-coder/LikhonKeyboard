@@ -306,6 +306,49 @@ screen. The screen talks to Google inside the Google app, so it works; the
 keyboard cannot keep itself visible under an activity started by another app —
 that is the platform's rule, not a choice here.
 
+## Settings
+
+Everything lives in one settings screen, grouped into cards.
+
+**Appearance** — theme (system / light / dark), accent colour (6 swatches), key
+shape (square / rounded / pill), key label size (small / normal / large), key
+borders, and keyboard height (drag the grip above the keys, or pick compact /
+normal / tall).
+
+**Typing** — vibration, key sound, auto-capitalise, Bangla hints, key preview,
+number row, double-space period, suggestion bar on/off, how many suggestions
+(4 / 6 / 8), incognito mode, learned words (count and forget-all), and the
+height reset.
+
+**Text shortcuts** — type a short word, press space, get the full text: emails,
+addresses, greetings. Add and delete them from the settings card.
+
+**Clipboard** — unlimited history, pinning with a pinned-only filter, one-by-one
+delete and a guarded delete-all. Stored in the app's private storage; password fields are
+never captured.
+
+**Voice** — language, method (automatic / inline / Google screen), recognition
+engine, Banglish output, continuous dictation, spoken-punctuation cleanup,
+trailing space, mic test, speech test and the in-memory voice log.
+
+**Editing** — undo, redo, copy, paste, clipboard, translate, more tools (select
+all, cut, clear field, UPPER / lower / Title, incognito) and settings, all in
+the toolbar above the suggestions.
+
+**Privacy** — nothing leaves the phone except the text you explicitly
+translate; incognito stops learning and clipboard capture; reset-all returns
+every setting to its default without touching the clipboard.
+
+## Libraries
+
+The keyboard is built only against the Android framework (org.json,
+HttpURLConnection, VectorDrawable, AudioRecord, SpeechRecognizer): the APK is
+about 440 KB, starts instantly and has no supply chain. `libs/` is wired into
+the ARM64 build script, so a plain `.jar` library can be dropped in and is
+dexed automatically; `libs/README.md` explains why AndroidX/AAR libraries are
+not used (they need aapt2 and would add megabytes for things the framework
+already provides).
+
 ## Toolbar icons
 
 The toolbar uses Material Design line icons as vector drawables
@@ -314,6 +357,17 @@ with the current theme. Every tap plays a short squash-and-settle animation and
 undo/redo pivot to show the way the history moved.
 
 ## Changes
+
+**1.12**
+
+- 20+ new settings and tools: accent colours, key shape, key label size, key
+  borders, keyboard height presets, suggestion bar on/off, suggestion count,
+  incognito mode, learned-words manager, text shortcuts, voice trailing space,
+  reset-all, plus a "more" panel with select all, cut, clear field and
+  UPPER/lower/Title conversion.
+- Clipboard history gained pinning (pinned copies stay on top) and a filter
+  for pinned entries.
+- `libs/` support in the ARM64 build script for plain-JAR libraries.
 
 **1.11**
 

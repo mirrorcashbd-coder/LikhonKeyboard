@@ -91,11 +91,14 @@ public class LikhonIme extends InputMethodService
     private LinearLayout clipList;
     private TextView clipCount;
     private LinearLayout translatePanel;
+    private LinearLayout morePanel;
     private TextView translateTitle;
     private TextView translateSourceView;
     private TextView translateResultView;
     private ClipStore clips;
+    private Shortcuts shortcuts;
     private UndoStack undoStack;
+    private int clipFilter;
     private Handler clipHandler;
     private Runnable clipPoll;
     private String lastClipSeen = "";
@@ -123,6 +126,11 @@ public class LikhonIme extends InputMethodService
 
     private static final int MAX_SUGGESTIONS = 18;
 
+    /** How many suggestions the bar may hold, from the settings. */
+    private int suggestionLimit() {
+        return Math.min(MAX_SUGGESTIONS, prefs.suggestionCount());
+    }
+
     private boolean bangla;
     private boolean shift;
     private boolean caps;
@@ -144,7 +152,7 @@ public class LikhonIme extends InputMethodService
         super.onCreate();
         prefs = new Prefs(this);
         bangla = prefs.bangla();
-        palette = Palette.resolve(this, prefs.theme());
+        palette = Palette.resolve(this, prefs.theme(), prefs.accent());
         prefs.register(this);
         uiHandler = new Handler(Looper.getMainLooper());
         VoiceScreenBridge.listen(() -> uiHandler.postDelayed(this::flushVoiceScreenText, 400));
@@ -178,6 +186,7 @@ public class LikhonIme extends InputMethodService
         suggestions = new Suggestions(this);
         learned = new LearnedWords(this);
         clips = new ClipStore(this);
+        shortcuts = new Shortcuts(this);
         undoStack = new UndoStack();
         toolBar = buildToolBar();
         root.addView(toolBar, new LinearLayout.LayoutParams(
@@ -528,10 +537,14 @@ public class LikhonIme extends InputMethodService
         if (keyboardView == null) {
             return;
         }
-        palette = Palette.resolve(this, prefs.theme());
+        palette = Palette.resolve(this, prefs.theme(), prefs.accent());
         keyboardView.setPalette(palette);
         keyboardView.setFeedback(prefs.haptic(), prefs.sound());
         keyboardView.setShowPreview(prefs.showPopup());
+        keyboardView.setKeyShape(prefs.keyShape());
+        keyboardView.setKeyBorders(prefs.keyBorders());
+        keyboardView.setLabelScale(prefs.labelSize() == 0 ? 0.9f
+                : (prefs.labelSize() == 2 ? 1.09f : 1f));
         styleVoicePanel();
         if (resizeHandle != null) {
             resizeHandle.setBackgroundColor(palette.bg);
@@ -551,6 +564,9 @@ public class LikhonIme extends InputMethodService
         }
         if (panelHost != null) {
             panelHost.setBackgroundColor(palette.surfaceAlt);
+        }
+        if (candidateScroll != null && !prefs.suggestionsEnabled()) {
+            candidateScroll.setVisibility(View.GONE);
         }
     }
 
@@ -588,6 +604,13 @@ public class LikhonIme extends InputMethodService
             case Key.SPACE:
                 learnCurrentWord();
                 finishWord();
+                if (!bangla && expandShortcut()) {
+                    commit(" ");
+                    afterTyped(" ");
+                    lastSpaceAt = 0;
+                    updateSuggestions();
+                    break;
+                }
                 long now = SystemClock.uptimeMillis();
                 if (prefs.doubleSpace() && lastSpaceAt > 0 && now - lastSpaceAt < 450) {
                     recordUndo(false);
@@ -855,7 +878,7 @@ public class LikhonIme extends InputMethodService
 
     /** Adds the word just finished to the learned list. */
     private void learnCurrentWord() {
-        if (learned == null || isSensitiveField()) {
+        if (learned == null || isSensitiveField() || prefs.incognito()) {
             return;
         }
         if (bangla && composing) {
@@ -902,6 +925,7 @@ public class LikhonIme extends InputMethodService
         toolButton(bar, R.drawable.ic_copy, R.string.action_copy, this::copyToClipboard);
         toolButton(bar, R.drawable.ic_paste, R.string.action_paste, this::pasteFromClipboard);
         toolButton(bar, R.drawable.ic_translate, R.string.action_translate, this::toggleTranslatePanel);
+        toolButton(bar, R.drawable.ic_more, R.string.action_more, this::toggleMorePanel);
         toolButton(bar, R.drawable.ic_settings, R.string.action_settings, this::openSettings);
         refreshToolbar();
         return bar;
@@ -995,6 +1019,213 @@ public class LikhonIme extends InputMethodService
             panelHost.removeAllViews();
             panelHost.setVisibility(View.GONE);
         }
+    }
+
+    /** Expands a text shortcut typed before the cursor, e.g. "mail". */
+    private boolean expandShortcut() {
+        if (shortcuts == null || prefs.incognito()) {
+            return false;
+        }
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) {
+            return false;
+        }
+        CharSequence before = ic.getTextBeforeCursor(64, 0);
+        if (before == null) {
+            return false;
+        }
+        String text = before.toString();
+        int start = text.length();
+        while (start > 0 && !Character.isWhitespace(text.charAt(start - 1))) {
+            start--;
+        }
+        if (start >= text.length()) {
+            return false;
+        }
+        String word = text.substring(start);
+        String expansion = shortcuts.get(word);
+        if (expansion == null) {
+            return false;
+        }
+        recordUndo(false);
+        ic.deleteSurroundingText(text.length() - start, 0);
+        ic.commitText(expansion, 1);
+        VoiceLog.add("shortcut: " + word);
+        return true;
+    }
+
+    // ------------------------------------------------------------- text tools
+
+    private void selectAllText() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) {
+            return;
+        }
+        ExtractedText et = extracted(ic);
+        if (et != null && et.text != null) {
+            ic.setSelection(0, et.text.length());
+        } else {
+            ic.performContextMenuAction(android.R.id.selectAll);
+        }
+        hidePanels();
+    }
+
+    private void cutSelection() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) {
+            return;
+        }
+        CharSequence selection = ic.getSelectedText(0);
+        if (selection == null || selection.toString().isEmpty()) {
+            Toast.makeText(this, R.string.clip_nothing, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        copyToClipboard();
+        recordUndo(false);
+        ic.commitText("", 1);
+        hidePanels();
+        lastSuggestionKey = "";
+        updateSuggestions();
+    }
+
+    private void clearField() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) {
+            return;
+        }
+        ExtractedText et = extracted(ic);
+        if (et == null || et.text == null) {
+            return;
+        }
+        if (et.text.length() == 0) {
+            hidePanels();
+            return;
+        }
+        recordUndo(false);
+        ic.setSelection(0, et.text.length());
+        ic.commitText("", 1);
+        hidePanels();
+        lastSuggestionKey = "";
+        updateSuggestions();
+    }
+
+    /** 0 = UPPER, 1 = lower, 2 = Title Case. */
+    private void applyCase(int mode) {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) {
+            return;
+        }
+        String target = null;
+        boolean whole = false;
+        CharSequence selection = ic.getSelectedText(0);
+        if (selection != null && !selection.toString().isEmpty()) {
+            target = selection.toString();
+        } else {
+            ExtractedText et = extracted(ic);
+            if (et != null && et.text != null && et.text.length() <= 4000) {
+                target = et.text.toString();
+                whole = true;
+            }
+        }
+        if (target == null || target.isEmpty()) {
+            Toast.makeText(this, R.string.tools_nothing, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String changed = changeCase(target, mode);
+        if (changed.equals(target)) {
+            hidePanels();
+            return;
+        }
+        recordUndo(false);
+        if (whole) {
+            ic.setSelection(0, target.length());
+        }
+        ic.commitText(changed, 1);
+        hidePanels();
+        lastSuggestionKey = "";
+        updateSuggestions();
+    }
+
+    private static String changeCase(String text, int mode) {
+        if (mode == 0) {
+            return text.toUpperCase(Locale.getDefault());
+        }
+        if (mode == 1) {
+            return text.toLowerCase(Locale.getDefault());
+        }
+        StringBuilder out = new StringBuilder(text.length());
+        boolean upper = true;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (Character.isLetter(c)) {
+                out.append(upper ? Character.toUpperCase(c) : Character.toLowerCase(c));
+                upper = false;
+            } else {
+                out.append(c);
+                if (c == '.' || c == '!' || c == '?' || c == '।' || c == '\n') {
+                    upper = true;
+                }
+            }
+        }
+        return out.toString();
+    }
+
+    private void toggleIncognito() {
+        prefs.setIncognito(!prefs.incognito());
+        Toast.makeText(this, prefs.incognito()
+                ? R.string.incognito_on : R.string.incognito_off, Toast.LENGTH_SHORT).show();
+        hidePanels();
+    }
+
+    private void toggleMorePanel() {
+        if (morePanel != null && morePanel.getParent() != null) {
+            hidePanels();
+            return;
+        }
+        hidePanels();
+        morePanel = buildMorePanel();
+        panelHost.addView(morePanel, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        panelHost.setVisibility(View.VISIBLE);
+    }
+
+    private LinearLayout buildMorePanel() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(8), dp(6), dp(8), dp(8));
+
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = Ui.text(this, getString(R.string.tools_title), 12,
+                palette.textMuted, true);
+        title.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        header.addView(title);
+        header.addView(panelButton("✕", this::hidePanels));
+        panel.addView(header, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout rowOne = Ui.horizontal(this);
+        rowOne.addView(panelButton(getString(R.string.tools_select_all), this::selectAllText));
+        rowOne.addView(panelButton(getString(R.string.tools_cut), this::cutSelection));
+        rowOne.addView(panelButton(getString(R.string.tools_clear), this::clearField));
+        panel.addView(rowOne);
+
+        LinearLayout rowTwo = Ui.horizontal(this);
+        rowTwo.addView(panelButton(getString(R.string.tools_upper), () -> applyCase(0)));
+        rowTwo.addView(panelButton(getString(R.string.tools_lower), () -> applyCase(1)));
+        rowTwo.addView(panelButton(getString(R.string.tools_title_case), () -> applyCase(2)));
+        panel.addView(rowTwo);
+
+        TextView incognito = panelButton(prefs.incognito()
+                ? getString(R.string.incognito_state_on)
+                : getString(R.string.incognito_state_off), this::toggleIncognito);
+        LinearLayout.LayoutParams incognitoParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        incognitoParams.topMargin = dp(6);
+        panel.addView(incognito, incognitoParams);
+        return panel;
     }
 
     // ------------------------------------------------------------------- undo
@@ -1122,7 +1353,7 @@ public class LikhonIme extends InputMethodService
     }
 
     private void captureClipboard() {
-        if (clips == null || isSensitiveField()) {
+        if (clips == null || isSensitiveField() || prefs.incognito()) {
             return;
         }
         try {
@@ -1256,9 +1487,24 @@ public class LikhonIme extends InputMethodService
         panel.addView(header, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
+        LinearLayout filters = Ui.horizontal(this);
+        filters.addView(panelButton(getString(R.string.clip_filter_all), () -> {
+            clipFilter = 0;
+            rebuildClipList();
+        }));
+        filters.addView(panelButton(getString(R.string.clip_filter_pinned), () -> {
+            clipFilter = 1;
+            rebuildClipList();
+        }));
+        LinearLayout.LayoutParams filterParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        filterParams.topMargin = dp(4);
+        panel.addView(filters, filterParams);
+
         ScrollView scroll = new ScrollView(this);
         scroll.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(140)));
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(150)));
         clipList = new LinearLayout(this);
         clipList.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(clipList);
@@ -1279,28 +1525,59 @@ public class LikhonIme extends InputMethodService
         return view;
     }
 
+    private static String preview(String text) {
+        String oneLine = text.replace('\n', ' ').trim();
+        return oneLine.length() <= 80 ? oneLine : oneLine.substring(0, 80) + "\u2026";
+    }
+
+    private boolean matchesFilter(ClipStore.Entry entry) {
+        return clipFilter == 0 || entry.pinned;
+    }
+
     private void rebuildClipList() {
         if (clipList == null || clips == null) {
             return;
         }
         clipList.removeAllViews();
-        List<ClipStore.Entry> entries = clips.entries();
-        if (clipCount != null) {
-            clipCount.setText(getString(R.string.clip_title_count, entries.size()));
+        List<ClipStore.Entry> all = clips.entries();
+        List<ClipStore.Entry> shown = new ArrayList<>();
+        for (ClipStore.Entry entry : all) {
+            if (matchesFilter(entry)) {
+                shown.add(entry);
+            }
         }
-        if (entries.isEmpty()) {
+        if (clipCount != null) {
+            clipCount.setText(clipFilter == 1
+                    ? getString(R.string.clip_title_found, shown.size(), all.size())
+                    : getString(R.string.clip_title_count, all.size()));
+        }
+        if (shown.isEmpty()) {
             clipList.addView(Ui.text(this, getString(R.string.clip_empty), 12,
                     palette.textMuted, false));
             return;
         }
-        for (final ClipStore.Entry entry : entries) {
+        for (final ClipStore.Entry entry : shown) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
+
+            ImageView pin = new ImageView(this);
+            pin.setImageResource(R.drawable.ic_pin);
+            pin.setColorFilter(entry.pinned ? palette.accent : palette.textMuted);
+            pin.setContentDescription(getString(entry.pinned
+                    ? R.string.clip_unpin : R.string.clip_pin));
+            pin.setPadding(dp(8), dp(9), dp(8), dp(9));
+            pin.setOnClickListener(v -> {
+                clips.setPinned(entry.id, !entry.pinned);
+                rebuildClipList();
+            });
+            row.addView(pin, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
             TextView text = Ui.text(this, preview(entry.text), 13, palette.text, false);
             text.setSingleLine(true);
             text.setEllipsize(TextUtils.TruncateAt.END);
-            text.setPadding(dp(10), dp(9), dp(10), dp(9));
+            text.setPadding(dp(2), dp(9), dp(10), dp(9));
             text.setBackground(Ui.ripple(this, palette.surface, 8, palette.keyStroke));
             text.setLayoutParams(new LinearLayout.LayoutParams(
                     0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
@@ -1308,7 +1585,13 @@ public class LikhonIme extends InputMethodService
                 insertText(entry.text);
                 hidePanels();
             });
+            text.setOnLongClickListener(v -> {
+                clips.setPinned(entry.id, !entry.pinned);
+                rebuildClipList();
+                return true;
+            });
             row.addView(text);
+
             TextView delete = Ui.text(this, "✕", 13, palette.textMuted, true);
             delete.setPadding(dp(12), dp(9), dp(6), dp(9));
             delete.setContentDescription(getString(R.string.clip_delete));
@@ -1317,6 +1600,7 @@ public class LikhonIme extends InputMethodService
                 rebuildClipList();
             });
             row.addView(delete);
+
             LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -1325,10 +1609,6 @@ public class LikhonIme extends InputMethodService
         }
     }
 
-    /**
-     * Two taps instead of a dialog: an input method cannot reliably open a
-     * dialog window, so the first tap only arms the button.
-     */
     private void confirmClearClips() {
         if (clips == null || clips.size() == 0) {
             return;
@@ -1344,11 +1624,6 @@ public class LikhonIme extends InputMethodService
         clips.clear();
         rebuildClipList();
         Toast.makeText(this, R.string.clip_cleared, Toast.LENGTH_SHORT).show();
-    }
-
-    private static String preview(String text) {
-        String oneLine = text.replace('\n', ' ').trim();
-        return oneLine.length() <= 80 ? oneLine : oneLine.substring(0, 80) + "…";
     }
 
     // -------------------------------------------------------------- translate
@@ -1600,7 +1875,7 @@ public class LikhonIme extends InputMethodService
             return;
         }
         recordUndo(false);
-        commit(converted + " ");
+        commit(converted + voiceSuffix());
         VoiceLog.add("screen insert: " + converted);
         learnSentence(converted);
         lastSuggestionKey = "";
@@ -1693,6 +1968,10 @@ public class LikhonIme extends InputMethodService
     }
 
     /** Applies the cleanup + optional Banglish conversion to raw speech. */
+    private String voiceSuffix() {
+        return prefs.voiceTrailingSpace() ? " " : "";
+    }
+
     private String voiceText(String raw) {
         if (raw == null) {
             return "";
@@ -1863,7 +2142,7 @@ public class LikhonIme extends InputMethodService
         voicePreviewing = false;
         voiceGotText = true;
         recordUndo(false);
-        commit(converted + " ");
+        commit(converted + voiceSuffix());
         VoiceLog.add("insert: " + converted);
         learnSentence(converted);
         if (voiceStatus != null) {
@@ -2069,7 +2348,7 @@ public class LikhonIme extends InputMethodService
         merged.addAll(learned.suggest(prefix, bangla, 8));
         List<String> base;
         if (prefix.isEmpty()) {
-            base = suggestions.popular(bangla, MAX_SUGGESTIONS);
+            base = suggestions.popular(bangla, suggestionLimit());
         } else if (bangla) {
             base = suggestions.bangla(prefix);
         } else {
@@ -2087,7 +2366,7 @@ public class LikhonIme extends InputMethodService
         if (merged.isEmpty()) {
             // Nothing matched: keep the promise that suggestions are always
             // there by falling back to common words.
-            merged = suggestions.popular(bangla, MAX_SUGGESTIONS);
+            merged = suggestions.popular(bangla, suggestionLimit());
         }
         if (!bangla && !merged.isEmpty()) {
             boolean capital = !prefix.isEmpty()
@@ -2101,13 +2380,17 @@ public class LikhonIme extends InputMethodService
                 merged = cased;
             }
         }
-        if (merged.size() > MAX_SUGGESTIONS) {
-            merged = new ArrayList<>(merged.subList(0, MAX_SUGGESTIONS));
+        if (merged.size() > suggestionLimit()) {
+            merged = new ArrayList<>(merged.subList(0, suggestionLimit()));
         }
         showCandidates(merged);
     }
 
     private void showCandidates(List<String> words) {
+        if (!prefs.suggestionsEnabled()) {
+            candidateScroll.setVisibility(View.GONE);
+            return;
+        }
         if (candidateRow == null || candidateScroll == null) {
             return;
         }
@@ -2188,7 +2471,7 @@ public class LikhonIme extends InputMethodService
 
     /** Every word of a dictated sentence becomes a suggestion for later. */
     private void learnSentence(String text) {
-        if (learned == null || isSensitiveField()) {
+        if (learned == null || isSensitiveField() || prefs.incognito()) {
             return;
         }
         for (String word : text.split("[\\s,.;:!?।]+")) {

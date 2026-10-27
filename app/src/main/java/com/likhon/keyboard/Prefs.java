@@ -25,6 +25,14 @@ final class Prefs {
     static final String KEY_POPUP = "key_popup";
     static final String KEY_NUMBER_ROW = "number_row";
     static final String KEY_DOUBLE_SPACE = "double_space";
+    static final String KEY_ACCENT = "accent";
+    static final String KEY_KEY_SHAPE = "key_shape";
+    static final String KEY_LABEL_SIZE = "label_size";
+    static final String KEY_KEY_BORDERS = "key_borders";
+    static final String KEY_SUGGESTIONS = "suggestions";
+    static final String KEY_SUGGESTION_COUNT = "suggestion_count";
+    static final String KEY_VOICE_TRAILING = "voice_trailing_space";
+    static final String KEY_INCOGNITO = "incognito";
 
     /** Voice language follows the typing language. */
     static final String VOICE_AUTO = "auto";
@@ -117,6 +125,55 @@ final class Prefs {
 
     void setVoiceMode(String value) {
         sp.edit().putString(KEY_VOICE_MODE, value).apply();
+    }
+
+    int accent() {
+        return sp.getInt(KEY_ACCENT, 0);
+    }
+
+    int keyShape() {
+        return sp.getInt(KEY_KEY_SHAPE, 1);
+    }
+
+    void setKeyShape(int value) {
+        sp.edit().putInt(KEY_KEY_SHAPE, value).apply();
+    }
+
+    int labelSize() {
+        return sp.getInt(KEY_LABEL_SIZE, 1);
+    }
+
+    void setLabelSize(int value) {
+        sp.edit().putInt(KEY_LABEL_SIZE, value).apply();
+    }
+
+    boolean keyBorders() {
+        return sp.getBoolean(KEY_KEY_BORDERS, true);
+    }
+
+    boolean suggestionsEnabled() {
+        return sp.getBoolean(KEY_SUGGESTIONS, true);
+    }
+
+    int suggestionCount() {
+        int value = sp.getInt(KEY_SUGGESTION_COUNT, 6);
+        return value < 3 ? 3 : (value > 12 ? 12 : value);
+    }
+
+    void setSuggestionCount(int value) {
+        sp.edit().putInt(KEY_SUGGESTION_COUNT, value).apply();
+    }
+
+    boolean voiceTrailingSpace() {
+        return sp.getBoolean(KEY_VOICE_TRAILING, true);
+    }
+
+    boolean incognito() {
+        return sp.getBoolean(KEY_INCOGNITO, false);
+    }
+
+    void setIncognito(boolean value) {
+        sp.edit().putBoolean(KEY_INCOGNITO, value).apply();
     }
 
     boolean showPopup() {

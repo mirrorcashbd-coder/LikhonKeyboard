@@ -11,6 +11,8 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -19,17 +21,20 @@ import java.util.List;
  * <p>Nothing is ever dropped automatically: the list grows for as long as the
  * user keeps copying and only shrinks when an entry (or the whole list) is
  * deleted by hand from the keyboard's clipboard panel. Entries are stored one
- * per line as {@code id<TAB>base64(text)}, so newlines inside a copy survive.
+ * per line as {@code id<TAB>base64(text)}, so newlines inside a copy survive;
+ * a leading {@code p} marks a pinned entry.
  */
 final class ClipStore {
 
     static final class Entry {
         final long id;
         final String text;
+        boolean pinned;
 
-        Entry(long id, String text) {
+        Entry(long id, String text, boolean pinned) {
             this.id = id;
             this.text = text;
+            this.pinned = pinned;
         }
     }
 
@@ -44,10 +49,20 @@ final class ClipStore {
         file = new File(context.getApplicationContext().getFilesDir(), FILE_NAME);
     }
 
-    /** Newest first. */
+    /** Pinned first, then newest first. */
     synchronized List<Entry> entries() {
         load();
-        return new ArrayList<>(entries);
+        List<Entry> sorted = new ArrayList<>(entries);
+        Collections.sort(sorted, new Comparator<Entry>() {
+            @Override
+            public int compare(Entry a, Entry b) {
+                if (a.pinned != b.pinned) {
+                    return a.pinned ? -1 : 1;
+                }
+                return Long.compare(b.id, a.id);
+            }
+        });
+        return sorted;
     }
 
     synchronized int size() {
@@ -71,9 +86,20 @@ final class ClipStore {
                 break;
             }
         }
-        entries.add(0, new Entry(nextId++, clean));
+        entries.add(new Entry(nextId++, clean, false));
         save();
         return true;
+    }
+
+    synchronized void setPinned(long id, boolean pinned) {
+        load();
+        for (Entry entry : entries) {
+            if (entry.id == id) {
+                entry.pinned = pinned;
+                save();
+                return;
+            }
+        }
     }
 
     synchronized void remove(long id) {
@@ -109,16 +135,21 @@ final class ClipStore {
                 if (tab <= 0) {
                     continue;
                 }
+                String head = line.substring(0, tab);
+                boolean pinned = head.startsWith("p");
+                if (pinned) {
+                    head = head.substring(1);
+                }
                 long id;
                 try {
-                    id = Long.parseLong(line.substring(0, tab));
+                    id = Long.parseLong(head);
                 } catch (NumberFormatException e) {
                     continue;
                 }
                 String text = new String(Base64.decode(line.substring(tab + 1),
                         Base64.NO_WRAP), StandardCharsets.UTF_8);
                 if (!text.trim().isEmpty()) {
-                    entries.add(new Entry(id, text));
+                    entries.add(new Entry(id, text, pinned));
                     if (id >= nextId) {
                         nextId = id + 1;
                     }
@@ -133,6 +164,9 @@ final class ClipStore {
         try (OutputStreamWriter writer = new OutputStreamWriter(
                 new FileOutputStream(file), StandardCharsets.UTF_8)) {
             for (Entry entry : entries) {
+                if (entry.pinned) {
+                    writer.write('p');
+                }
                 writer.write(Long.toString(entry.id));
                 writer.write('\t');
                 writer.write(Base64.encodeToString(

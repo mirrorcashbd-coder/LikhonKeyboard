@@ -69,6 +69,16 @@ final class LearnedWords {
         return removed;
     }
 
+    int size() {
+        return index.size();
+    }
+
+    /** Forgets every learned word and rewrites the file. */
+    void clear() {
+        index.clear();
+        save();
+    }
+
     /** Writes pending changes now (called when the keyboard closes). */
     void flush() {
         handler.removeCallbacks(saveTask);

@@ -20,8 +20,8 @@ SDK="${ANDROID_SDK_ROOT:-/root/android-sdk}"
 PLATFORM="$SDK/platforms/android-34/android.jar"
 D8_JAR="$SDK/build-tools/34.0.0/lib/d8.jar"
 OUT="build/manual"
-VERSION_NAME="1.11"
-VERSION_CODE="12"
+VERSION_NAME="1.12"
+VERSION_CODE="13"
 MIN_SDK="23"
 TARGET_SDK="34"
 
@@ -30,6 +30,20 @@ for tool in aapt zipalign apksigner javac java keytool; do
 done
 [ -f "$PLATFORM" ] || { echo "missing $PLATFORM" >&2; exit 1; }
 [ -f "$D8_JAR" ] || { echo "missing $D8_JAR" >&2; exit 1; }
+
+# Optional plain-JAR libraries. Any libs/*.jar is dexed together with the app,
+# so a dependency that ships only classes (no Android resources) can be dropped
+# in without touching this script. AndroidX/AAR libraries need aapt2 and are not
+# supported by this aapt/d8 tool-chain; see libs/README.md.
+LIBS=()
+if [ -d libs ]; then
+    for jar in libs/*.jar; do
+        [ -e "$jar" ] && LIBS+=("$jar")
+    done
+fi
+if [ ${#LIBS[@]} -gt 0 ]; then
+    echo "==> libraries: ${LIBS[*]}"
+fi
 
 rm -rf "$OUT"
 mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/dex" "$OUT/logs"
@@ -61,7 +75,7 @@ find "$OUT/classes" -name '*.class' > "$OUT/classes.txt"
 java -cp "$D8_JAR" com.android.tools.r8.D8 \
     --release --min-api "$MIN_SDK" --lib "$PLATFORM" \
     --output "$OUT/dex" \
-    @"$OUT/classes.txt"
+    @"$OUT/classes.txt" "${LIBS[@]}"
 
 echo "==> package resources"
 aapt package -f \

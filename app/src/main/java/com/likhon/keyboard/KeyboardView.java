@@ -41,6 +41,11 @@ public class KeyboardView extends View {
     private static final float GAP_DP = 6f;
     private static final float KEY_RADIUS_DP = 9f;
 
+    // Appearance knobs, set from the settings screen.
+    private float keyRadiusDp = KEY_RADIUS_DP;
+    private float labelScale = 1f;
+    private boolean keyBorders = true;
+
     private static final long LONG_PRESS_MS = 400;
     private static final long REPEAT_DELAY_MS = 330;
     private static final long REPEAT_INTERVAL_MS = 45;
@@ -307,11 +312,11 @@ public class KeyboardView extends View {
         } else {
             bg = pressed ? palette.keyPressed : palette.keyBg;
         }
-        float radius = Math.min(dp(KEY_RADIUS_DP), r.height() / 2f);
+        float radius = Math.min(dp(keyRadiusDp), r.height() / 2f);
         fillPaint.setColor(bg);
         canvas.drawRoundRect(r, radius, radius, fillPaint);
 
-        if (!key.active && key.isChar()) {
+        if (keyBorders && !key.active && key.isChar()) {
             strokePaint.setColor(palette.keyStroke);
             strokePaint.setStrokeWidth(dp(1f));
             tmpRect.set(r);
@@ -368,7 +373,7 @@ public class KeyboardView extends View {
         int codePoint = label.codePointAt(0);
         boolean emoji = codePoint >= 0x1F000;
         textPaint.setColor(color);
-        float size = r.height() * (emoji ? 0.5f : 0.44f) * scale;
+        float size = r.height() * (emoji ? 0.5f : 0.44f) * scale * labelScale;
         if (!emoji && label.length() > 1) {
             size *= label.length() >= 4 ? 0.58f : 0.74f;
         }
@@ -535,6 +540,28 @@ public class KeyboardView extends View {
     }
 
     private boolean showPreview = true;
+
+    void setKeyShape(int shape) {
+        float radius = shape == 0 ? 4f : (shape == 2 ? 200f : KEY_RADIUS_DP);
+        if (keyRadiusDp != radius) {
+            keyRadiusDp = radius;
+            invalidate();
+        }
+    }
+
+    void setLabelScale(float value) {
+        if (labelScale != value) {
+            labelScale = value;
+            invalidate();
+        }
+    }
+
+    void setKeyBorders(boolean value) {
+        if (keyBorders != value) {
+            keyBorders = value;
+            invalidate();
+        }
+    }
 
     void setShowPreview(boolean value) {
         if (showPreview != value) {
