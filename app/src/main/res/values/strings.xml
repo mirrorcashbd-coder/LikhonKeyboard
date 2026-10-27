@@ -74,7 +74,7 @@
     <string name="voice_heard_nothing">Nothing was heard — speak again (%1$s)</string>
     <string name="voice_retrying">Restarting the microphone…</string>
     <string name="voice_sheet_prompt">Speak now</string>
-    <string name="voice_check_hint">Still no words. Open settings → voice → speech service check to see why.</string>
+    <string name="voice_check_hint">Still no words. Hold the mic key for the phone’s voice screen, or run the speech service check in settings.</string>
     <string name="voice_trying_bn_in">Trying Bangla (India)…</string>
     <string name="voice_trying_on_device">Trying on-device voice…</string>
 
