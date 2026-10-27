@@ -39,6 +39,19 @@ public final class VoiceCheck {
         clean("umm you know it is fine", "It is fine");
         clean("কথা বলা হয়ে গেছে ।", "কথা বলা হয়ে গেছে।");
 
+        // Spoken punctuation, the Rambler way.
+        command("hello comma world period", false, "hello, world.");
+        command("what is this question mark", false, "what is this?");
+        command("wow exclamation mark", false, "wow!");
+        command("first line new line second line", false, "first line\nsecond line");
+        command("the period of this is long", false, "the period of this is long");
+        command("নতুন লাইন", true, "\n");
+        command("দাঁড়ি", true, "।");
+        command("কমা", true, ",");
+        check("delete command", VoiceText.isDeleteCommand("Delete that."));
+        check("delete bangla", VoiceText.isDeleteCommand("মুছে ফেলো"));
+        check("not a delete command", !VoiceText.isDeleteCommand("delete the file"));
+
         if (failures == 0) {
             System.out.println("All voice expectations passed.");
         } else {
@@ -53,6 +66,22 @@ public final class VoiceCheck {
             failures++;
             System.out.println("Romanize «" + bangla + "» -> «" + actual
                     + "», expected «" + banglish + "»");
+        }
+    }
+
+    private static void command(String raw, boolean bangla, String expected) {
+        String actual = VoiceText.commands(raw, bangla);
+        if (!expected.equals(actual)) {
+            failures++;
+            System.out.println("commands «" + raw + "» -> «" + actual
+                    + "», expected «" + expected + "»");
+        }
+    }
+
+    private static void check(String label, boolean ok) {
+        if (!ok) {
+            failures++;
+            System.out.println("FAIL " + label);
         }
     }
 

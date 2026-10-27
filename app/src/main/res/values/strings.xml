@@ -45,7 +45,7 @@
 
     <string name="section_about">About</string>
     <string name="about_body">Likhon is a small, offline keyboard. It has no ads and never sends anything anywhere; the microphone is used only for voice typing. English is a standard QWERTY layout; Bangla is phonetic, so you type the sound in English letters.</string>
-    <string name="about_version">Version 1.3</string>
+    <string name="about_version">Version 1.4</string>
     <string name="footer">Offline · No ads · Optional microphone</string>
     <string name="about_guide">Bangla typing guide</string>
 
@@ -94,4 +94,6 @@
     <string name="resize_hint">Drag to resize the keyboard</string>
     <string name="resize_reset">Keyboard size reset</string>
     <string name="suggestion_forgotten">Removed from suggestions</string>
+    <string name="voice_deleting">Deleting…</string>
+    <string name="voice_deleted">Deleted</string>
 </resources>

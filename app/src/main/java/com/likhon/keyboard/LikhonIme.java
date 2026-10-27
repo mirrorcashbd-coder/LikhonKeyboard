@@ -52,6 +52,8 @@ public class LikhonIme extends InputMethodService
     private VoiceInput voice;
     private boolean voiceListening;
     private boolean voicePreviewing;
+    private View voiceLevel;
+    private LinearLayout.LayoutParams voiceLevelParams;
 
     private Suggestions suggestions;
     private LearnedWords learned;
@@ -151,6 +153,12 @@ public class LikhonIme extends InputMethodService
         panel.setGravity(Gravity.CENTER_VERTICAL);
         panel.setPadding(pad, dp(5), pad, dp(5));
         panel.setVisibility(View.GONE);
+
+        voiceLevel = new View(this);
+        voiceLevel.setBackground(Ui.rounded(this, palette.accent, 2));
+        voiceLevelParams = new LinearLayout.LayoutParams(dp(3), dp(6));
+        voiceLevelParams.rightMargin = dp(8);
+        panel.addView(voiceLevel, voiceLevelParams);
 
         voiceStatus = new TextView(this);
         voiceStatus.setTextSize(14f);
@@ -431,6 +439,9 @@ public class LikhonIme extends InputMethodService
         }
         if (gripView != null) {
             gripView.setBackground(Ui.rounded(this, palette.keySpecial, 2));
+        }
+        if (voiceLevel != null) {
+            voiceLevel.setBackground(Ui.rounded(this, palette.accent, 2));
         }
     }
 
@@ -767,6 +778,7 @@ public class LikhonIme extends InputMethodService
         }
         finishWord();
         hideCandidates();
+        resetVoiceLevel();
         voicePreviewing = false;
         voiceListening = true;
         keyboardView.setVoiceActive(true);
@@ -777,6 +789,13 @@ public class LikhonIme extends InputMethodService
             voice = new VoiceInput(this, this);
         }
         voice.start(voiceLanguage(), prefs.voiceContinuous());
+    }
+
+    private void resetVoiceLevel() {
+        if (voiceLevel != null && voiceLevelParams != null) {
+            voiceLevelParams.width = dp(3);
+            voiceLevel.setLayoutParams(voiceLevelParams);
+        }
     }
 
     /** Asks the recogniser to finish what it heard and closes the strip. */
@@ -790,6 +809,7 @@ public class LikhonIme extends InputMethodService
         }
         voiceListening = false;
         voicePreviewing = false;
+        resetVoiceLevel();
         if (keyboardView != null) {
             keyboardView.setVoiceActive(false);
         }
@@ -857,10 +877,56 @@ public class LikhonIme extends InputMethodService
         if (text.isEmpty()) {
             return "";
         }
+        // Spoken punctuation, as in Gboard's Rambler: "hello comma world".
+        text = VoiceText.commands(text, voiceIsBangla());
+        if (text.isEmpty()) {
+            return "";
+        }
         if (prefs.voiceBanglish() && voiceIsBangla()) {
-            text = Romanize.toLatin(text);
+            text = Romanize.toLatin(text).replace('।', '.');
         }
         return text;
+    }
+
+    /** Removes the live preview from the editor without leaving text behind. */
+    private void clearVoicePreview() {
+        if (!voicePreviewing) {
+            return;
+        }
+        InputConnection ic = getCurrentInputConnection();
+        if (ic != null) {
+            ic.setComposingText("", 1);
+            ic.finishComposingText();
+        }
+        voicePreviewing = false;
+    }
+
+    /** Deletes the word before the cursor, including the space after it. */
+    private void deleteLastWord() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) {
+            return;
+        }
+        CharSequence before = ic.getTextBeforeCursor(64, 0);
+        if (before == null || before.length() == 0) {
+            ic.deleteSurroundingText(1, 0);
+            return;
+        }
+        int end = before.length();
+        while (end > 0 && Character.isWhitespace(before.charAt(end - 1))) {
+            end--;
+        }
+        int start = end;
+        while (start > 0 && !Character.isWhitespace(before.charAt(start - 1))) {
+            start--;
+        }
+        int words = end - start;
+        int trailing = before.length() - end;
+        if (words <= 0) {
+            ic.deleteSurroundingText(1, 0);
+        } else {
+            ic.deleteSurroundingText(words + trailing, 0);
+        }
     }
 
     private void showVoicePreview(String text) {
@@ -906,6 +972,18 @@ public class LikhonIme extends InputMethodService
     }
 
     @Override
+    public void onVoiceLevel(float level) {
+        if (voiceLevel == null || voiceLevelParams == null) {
+            return;
+        }
+        int width = dp(3 + Math.round(level * 42f));
+        if (voiceLevelParams.width != width) {
+            voiceLevelParams.width = width;
+            voiceLevel.setLayoutParams(voiceLevelParams);
+        }
+    }
+
+    @Override
     public void onVoiceListening() {
         if (!voiceListening || voiceStatus == null) {
             return;
@@ -921,6 +999,12 @@ public class LikhonIme extends InputMethodService
         if (!voiceListening) {
             return;
         }
+        if (VoiceText.isDeleteCommand(text)) {
+            if (voiceStatus != null) {
+                voiceStatus.setText(R.string.voice_deleting);
+            }
+            return;
+        }
         String converted = voiceText(text);
         if (converted.isEmpty()) {
             return;
@@ -933,6 +1017,18 @@ public class LikhonIme extends InputMethodService
 
     @Override
     public void onVoiceResult(String text) {
+        if (VoiceText.isDeleteCommand(text)) {
+            clearVoicePreview();
+            deleteLastWord();
+            voicePreviewing = false;
+            if (voiceStatus != null) {
+                voiceStatus.setText(R.string.voice_deleted);
+            }
+            if (!prefs.voiceContinuous() && voiceListening) {
+                stopVoice(false);
+            }
+            return;
+        }
         String converted = voiceText(text);
         if (converted.isEmpty()) {
             return;
@@ -959,6 +1055,7 @@ public class LikhonIme extends InputMethodService
         }
         voiceListening = false;
         voicePreviewing = false;
+        resetVoiceLevel();
         if (keyboardView != null) {
             keyboardView.setVoiceActive(false);
         }

@@ -4,14 +4,14 @@ A small, fast, **offline** Android keyboard with an English QWERTY layout and
 phonetic Bangla typing. Written in plain Java against the Android framework:
 no AndroidX, no third-party libraries, no internet permission, no ads.
 
-**APK:** `build/manual/LikhonKeyboard-1.3.apk` (also copied to
-`/sdcard/Download/LikhonKeyboard-1.3.apk`)
+**APK:** `build/manual/LikhonKeyboard-1.4.apk` (also copied to
+`/sdcard/Download/LikhonKeyboard-1.4.apk`)
 
 ---
 
 ## Install
 
-1. Open `LikhonKeyboard-1.3.apk` in the Files app and allow "install unknown apps"
+1. Open `LikhonKeyboard-1.4.apk` in the Files app and allow "install unknown apps"
    for that app if asked.
 2. Open **Likhon Keyboard** from the app drawer.
 3. Tap **Enable keyboard** → turn on "Likhon Keyboard".
@@ -70,13 +70,21 @@ or tap **×** to close it.
   phone's speech service prefers one phrase per tap.
 - **Clean up** removes fillers and stutters (`উম`, `মানে`, `আঃ`, repeated words)
   and tidies punctuation.
+- **Spoken punctuation** like Rambler: say `comma`, `period` / `full stop`,
+  `question mark`, `exclamation mark`, `colon`, `semicolon` or `new line`
+  (Bangla: `কমা`, `দাঁড়ি`, `প্রশ্নচিহ্ন`, `বিস্ময়চিহ্ন`, `কোলন`,
+  `সেমিকোলন`, `নতুন লাইন`) and the mark is inserted instead of the word.
+- **Voice editing**: saying `delete that` (or `মুছে ফেলো`) deletes the word
+  before the cursor.
+- A small level bar in the voice strip shows how loudly you are speaking.
 - Partial results appear in the composing region and are replaced as the
   recogniser refines them; nothing is committed twice.
 
 Speech recognition is done by the speech service already on the phone (usually
-Google). Bangla may need the Bangla language pack downloaded in that app, and
-some phones only do recognition online. The keyboard itself never sends
-anything anywhere and has no internet permission.
+Google) — the same service Gboard uses for its Rambler voice typing. Bangla may
+need the Bangla language pack downloaded in that app, and some phones only do
+recognition online. The keyboard itself never sends anything anywhere and has
+no internet permission.
 
 ## Word suggestions
 
@@ -119,6 +127,15 @@ APK, not a keyboard implementation. It cannot be merged into Likhon (different
 app, GPL-3.0, and no source for the keyboard itself). Its ideas that fit here —
 always-on suggestions, learning what you type, and a resizable keyboard — were
 implemented from scratch in this project instead.
+
+The same is true of its voice typing: PixelBoard has no recogniser code. The
+Rambler patch changes methods in Gboard's own
+`VoiceSettingsFragment` (`aB`, `ac`, `f`, `aD`) so Gboard's hidden Rambler
+selector becomes available; the microphone, streaming, partials and punctuation
+all live inside Gboard. Because Android's `SpeechRecognizer` talks to the same
+speech service, Likhon can offer the same kind of dictation, and this version
+matches Rambler's behaviour (continuous session, live partials, filler cleanup,
+spoken punctuation, delete command, level meter) without copying GPL code.
 
 ## Bangla typing guide
 
@@ -165,7 +182,7 @@ equivalent ARM64 build script is included. It uses the Ubuntu/Debian
 tools/build-apk-arm64.sh
 ```
 
-Output: `build/manual/LikhonKeyboard-1.3.apk` (signed with the debug key in
+Output: `build/manual/LikhonKeyboard-1.4.apk` (signed with the debug key in
 `keystore/likhon-debug.jks`, generated on first run — keep that file if you want
 future builds to install over the current one).
 
@@ -215,6 +232,15 @@ simultaneous presses.
 
 ## Changes
 
+**1.4**
+
+- Voice typing now understands spoken punctuation (`comma`, `দাঁড়ি`,
+  `new line`, …), the `delete that` / `মুছে ফেলো` command, and shows a live
+  microphone level bar in the voice strip.
+- Continuous dictation restarts faster after each finished phrase (140 ms).
+- Documented why PixelBoard's voice patch cannot be copied: it only flips
+  Gboard's internal Rambler switch, it contains no speech recognition code.
+
 **1.3**
 
 - The suggestion strip is always visible: recent/learned words first, then the
@@ -254,7 +280,10 @@ simultaneous presses.
 - Learned words are stored unencrypted in the app's private files directory;
   they never leave the phone.
 - Voice typing depends on the phone's speech service; it does nothing if none
-  is installed, and Bangla needs a Bangla language pack.
+  is installed, and Bangla needs a Bangla language pack. It cannot use Gboard's
+  private Rambler implementation directly.
+- Voice punctuation only recognises the listed words, and `period`/`colon`
+  count as punctuation only at the end of a phrase (they are common nouns).
 - The custom keyboard view is not fully accessible to TalkBack; keys are not
   exposed as individual accessibility nodes.
 - Phonetic Bangla is rule-based, not a full dictionary. Very irregular words can

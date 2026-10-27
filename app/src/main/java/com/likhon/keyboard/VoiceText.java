@@ -151,4 +151,150 @@ final class VoiceText {
         }
         return text;
     }
+
+    // --------------------------------------------------------- voice commands
+
+    /** Two-word commands: words, replacement. */
+    private static final String[][] COMMAND_PHRASES = {
+            {"new", "line", "\n"},
+            {"new", "paragraph", "\n"},
+            {"full", "stop", "."},
+            {"question", "mark", "?"},
+            {"exclamation", "mark", "!"},
+            {"exclamation", "point", "!"},
+            {"\u09a8\u09a4\u09c1\u09a8", "\u09b2\u09be\u0987\u09a8", "\n"},
+    };
+
+    /** One-word commands; the same list covers both scripts. */
+    private static final String[][] COMMAND_WORDS = {
+            {"period", "."},
+            {"comma", ","},
+            {"colon", ":"},
+            {"semicolon", ";"},
+            {"\u09a6\u09be\u0981\u09dc\u09bf", "\u0964"},
+            {"\u0995\u09ae\u09be", ","},
+            {"\u09aa\u09cd\u09b0\u09b6\u09cd\u09a8\u099a\u09cd\u09b9\u09bf\u09a8", "?"},
+            {"\u09ac\u09bf\u09b8\u09cd\u09ae\u09df\u099a\u09cd\u09b9\u09bf\u09a8", "!"},
+            {"\u0995\u09cb\u09b2\u09a8", ":"},
+            {"\u09b8\u09c7\u09ae\u09bf\u0995\u09cb\u09b2\u09a8", ";"},
+    };
+
+    /**
+     * Turns spoken punctuation into the real thing, the way Gboard's Rambler
+     * voice typing does: “hello comma world period” becomes “hello, world.”.
+     * Commands are matched on whole words only, so “the period of this” is
+     * left alone unless the word really is a lone command token.
+     */
+    static String commands(String raw, boolean bangla) {
+        if (raw == null) {
+            return "";
+        }
+        String text = raw.replace('\n', ' ').trim();
+        if (text.isEmpty()) {
+            return "";
+        }
+        String[] words = text.split("\\s+");
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < words.length; i++) {
+            String replacement = null;
+            int consumed = 0;
+            String lower = normalise(words[i].toLowerCase(new Locale("en")));
+            for (String[] phrase : COMMAND_PHRASES) {
+                if (i + 1 < words.length
+                        && lower.equals(normalise(phrase[0]))
+                        && normalise(words[i + 1].toLowerCase(new Locale("en")))
+                                .equals(normalise(phrase[1]))) {
+                    replacement = phrase[2];
+                    consumed = 2;
+                    break;
+                }
+            }
+            if (replacement == null) {
+                for (String[] command : COMMAND_WORDS) {
+                    if (lower.equals(normalise(command[0]))) {
+                        replacement = command[1];
+                        consumed = 1;
+                        break;
+                    }
+                }
+            }
+            if (replacement != null) {
+                // “period” and “colon” are common nouns, so they only count at
+                // the end of a phrase; the other commands are unambiguous.
+                boolean nounLike = "period".equals(lower) || "colon".equals(lower);
+                if (nounLike && i != words.length - 1) {
+                    replacement = null;
+                }
+            }
+            if (replacement != null) {
+                if ("\n".equals(replacement)) {
+                    out.append('\n');
+                } else {
+                    if (out.length() > 0 && out.charAt(out.length() - 1) == ' ') {
+                        out.setLength(out.length() - 1);
+                    }
+                    if (bangla && ".".equals(replacement)) {
+                        replacement = "\u0964";
+                    }
+                    out.append(replacement);
+                }
+                i += consumed - 1;
+                continue;
+            }
+            if (out.length() > 0) {
+                char last = out.charAt(out.length() - 1);
+                if (last != ' ' && last != '\n') {
+                    out.append(' ');
+                }
+            }
+            out.append(words[i]);
+        }
+        int start = 0;
+        int end = out.length();
+        while (start < end && out.charAt(start) == ' ') {
+            start++;
+        }
+        while (end > start && out.charAt(end - 1) == ' ') {
+            end--;
+        }
+        return out.substring(start, end);
+    }
+
+    /** Bangla nukta letters can arrive precomposed or decomposed. */
+    private static String normalise(String word) {
+        StringBuilder sb = new StringBuilder(word.length() + 2);
+        for (int i = 0; i < word.length(); i++) {
+            char c = word.charAt(i);
+            if (c == '\u09dc') {
+                sb.append('\u09a1').append('\u09bc');
+            } else if (c == '\u09dd') {
+                sb.append('\u09a2').append('\u09bc');
+            } else if (c == '\u09df') {
+                sb.append('\u09af').append('\u09bc');
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    /** “delete that”, “মুছে ফেলো” and friends, as a whole phrase. */
+    static boolean isDeleteCommand(String raw) {
+        if (raw == null) {
+            return false;
+        }
+        String text = normalise(raw.toLowerCase(new Locale("en")).trim());
+        text = text.replaceAll("[\\p{Punct}\\u0964\\s]+$", "");
+        text = text.replaceAll("\\s+", " ");
+        return text.equals("delete")
+                || text.equals("delete that")
+                || text.equals("scratch that")
+                || text.equals("erase that")
+                || text.equals("\u09ae\u09c1\u099b\u09c7 \u09ab\u09c7\u09b2\u09cb")
+                || text.equals("\u09ae\u09c1\u099b\u09c7 \u09ab\u09c7\u09b2")
+                || text.equals("\u0993\u099f\u09be \u09ae\u09c1\u099b\u09c7 \u09ab\u09c7\u09b2\u09cb")
+                || text.equals("\u098f\u099f\u09be \u09ae\u09c1\u099b\u09c7 \u09ab\u09c7\u09b2\u09cb")
+                || text.equals("\u09b8\u09ac \u09ae\u09c1\u099b\u09c7 \u09ab\u09c7\u09b2\u09cb");
+    }
+
 }

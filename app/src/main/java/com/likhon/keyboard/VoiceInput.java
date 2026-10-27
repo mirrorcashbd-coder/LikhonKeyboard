@@ -29,6 +29,9 @@ final class VoiceInput implements RecognitionListener {
         /** Unstable preview of what is being said. */
         void onVoicePartial(String text);
 
+        /** Microphone level, 0 (silence) … 1 (loud), for the level bar. */
+        void onVoiceLevel(float level);
+
         /** A finished phrase, ready to be inserted. */
         void onVoiceResult(String text);
 
@@ -43,6 +46,7 @@ final class VoiceInput implements RecognitionListener {
     }
 
     private static final long RESTART_DELAY_MS = 320;
+    private static final long RESULT_RESTART_MS = 140;
 
     private final Context context;
     private final Listener listener;
@@ -192,7 +196,14 @@ final class VoiceInput implements RecognitionListener {
 
     @Override
     public void onRmsChanged(float rmsdB) {
-        // Could drive a level meter; intentionally unused.
+        float level = (rmsdB + 2f) / 12f;
+        if (level < 0f) {
+            level = 0f;
+        }
+        if (level > 1f) {
+            level = 1f;
+        }
+        listener.onVoiceLevel(level);
     }
 
     @Override
@@ -238,7 +249,7 @@ final class VoiceInput implements RecognitionListener {
             listener.onVoiceResult(text);
         }
         if (wantListening && continuous) {
-            handler.postDelayed(restart, RESTART_DELAY_MS);
+            handler.postDelayed(restart, RESULT_RESTART_MS);
             listener.onVoiceListening();
         } else if (wantListening) {
             wantListening = false;
