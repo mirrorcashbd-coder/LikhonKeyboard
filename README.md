@@ -341,24 +341,27 @@ every setting to its default without touching the clipboard.
 
 ## Design
 
-Six designed skins ship next to the plain light/dark pair. Each one carries its
-own vertical gradient, a soft key shadow and, where it helps, an accent glow:
+The settings are **separate Material 3 screens**, not one endless scroll:
 
-| Skin | Look |
+| Screen | What lives there |
 | --- | --- |
-| Aurora | indigo night, mint accent, soft glow |
-| Midnight | near-black navy, warm gold |
-| Paper | warm cream, terracotta |
-| Glacier | icy white-blue |
-| Neon | black with electric lime |
-| Graphite | calm grey with red |
+| Home | keyboard status, six quick tiles, guide and system links |
+| Appearance | themes, live preview, accent, key shape, label size, spacing, borders |
+| Typing | feedback, suggestions, number row, keyboard height, privacy |
+| Languages | writing mode and all 39 languages |
+| Voice | microphone, recognition engine, live tests and the log |
+| Tools | shortcuts, clipboard, learned words |
+| Backup | export, import and reset |
+| About | version, libraries and the guide |
 
-The appearance card shows a **live preview** painted with the same code the
-keyboard uses, so the gradient, shadow and accent are exactly what will type.
-Accent colour, key shape (square / rounded / pill), label size, key spacing
-(compact / normal / airy) and borders can be layered on any skin. The settings
-header is a gradient hero card, the keyboard background and toolbar share the
-skin's gradient, and the first suggestion is highlighted in the accent colour.
+Each screen has its own large top app bar, back button, slide transition and
+back stack. Depth is layered: every surface is a top-lit gradient plus a
+hairline outline plus a real elevation shadow. Tiles spring in when pressed,
+segmented controls carry a raised selected pill, and the switches are
+hand-drawn with a floating thumb and a spring animation. Everything derives
+from the palette, so the six designed skins (Aurora, Midnight, Paper, Glacier,
+Neon, Graphite), the plain light/dark pair and every accent colour work on
+every screen.
 
 ## Languages
 
@@ -413,6 +416,19 @@ with the current theme. Every tap plays a short squash-and-settle animation and
 undo/redo pivot to show the way the history moved.
 
 ## Changes
+
+**1.16**
+
+- Settings split into eight separate screens with a real back stack and slide
+  transitions: Home, Appearance, Typing, Languages, Voice, Tools, Backup and
+  About.
+- New Material 3 component set drawn in code: top-lit surfaces, hairline
+  outlines, elevation shadows, large top app bars, tonal and filled buttons,
+  segmented controls, list rows and quick tiles.
+- Hand-drawn switch with a floating thumb, spring animation and pressed halo.
+- Theme picker redesigned as gradient swatches; accent picker as raised colour
+  dots; live keyboard preview kept.
+- Home grid of six quick tiles plus guide/keyboard/about rows.
 
 **1.15**
 

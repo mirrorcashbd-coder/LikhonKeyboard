@@ -55,12 +55,7 @@ final class Ui {
     }
 
     static LinearLayout card(Context context, Palette palette) {
-        LinearLayout card = new LinearLayout(context);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setBackground(rounded(context, palette.surface, 20));
-        int padding = dp(context, 18);
-        card.setPadding(padding, padding, padding, padding);
-        return card;
+        return M3.card(context, palette);
     }
 
     static LinearLayout vertical(Context context) {
@@ -87,16 +82,8 @@ final class Ui {
 
     static TextView button(Context context, Palette palette, String label, boolean primary,
                            Runnable action) {
-        TextView button = text(context, label, 14, primary ? palette.onAccent : palette.text, true);
-        button.setGravity(Gravity.CENTER);
-        button.setPadding(dp(context, 18), dp(context, 11), dp(context, 18), dp(context, 11));
-        int surface = primary ? palette.accent : palette.keySpecial;
-        int rippleColor = primary ? 0x40FFFFFF : palette.keyStroke;
-        button.setBackground(ripple(context, surface, 12, rippleColor));
-        button.setClickable(true);
-        button.setFocusable(true);
-        button.setOnClickListener(v -> action.run());
-        return button;
+        return primary ? M3.filledButton(context, palette, label, action)
+                : M3.tonalButton(context, palette, label, action);
     }
 
     /** Text that looks and behaves like a settings row. */

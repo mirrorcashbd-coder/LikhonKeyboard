@@ -45,7 +45,7 @@
 
     <string name="section_about">About</string>
     <string name="about_body">Likhon is a small, offline keyboard. It has no ads and never sends anything anywhere; the microphone is used only for voice typing. English is a standard QWERTY layout; Bangla is phonetic, so you type the sound in English letters.</string>
-    <string name="about_version">Version 1.15</string>
+    <string name="about_version">Version 1.16</string>
     <string name="footer">Offline · No ads · Optional microphone</string>
     <string name="about_guide">Bangla typing guide</string>
 
@@ -245,9 +245,45 @@
     <string name="theme_glacier">Glacier</string>
     <string name="theme_neon">Neon</string>
     <string name="theme_graphite">Graphite</string>
-    <string name="hero_version">v1.15</string>
+    <string name="hero_version">v1.16</string>
     <string name="key_gap">Key spacing</string>
     <string name="gap_compact">Compact</string>
     <string name="gap_normal">Normal</string>
     <string name="gap_airy">Airy</string>
+    <string name="home_quick">Quick settings</string>
+    <string name="home_more">More</string>
+    <string name="home_guide_sub">First-time setup, step by step</string>
+    <string name="home_keyboard">System keyboard</string>
+    <string name="home_keyboard_sub">Turn it on and pick it</string>
+    <string name="about_short">Version, guide and libraries</string>
+    <string name="tile_appearance_sub">Themes and colour</string>
+    <string name="tile_typing_sub">Suggestions and feedback</string>
+    <string name="tile_languages_sub">39 languages</string>
+    <string name="tile_voice_sub">Microphone and engine</string>
+    <string name="tile_tools_sub">Shortcuts and clipboard</string>
+    <string name="tile_backup_sub">Backup and reset</string>
+    <string name="theme_label">Theme</string>
+    <string name="accent_section">Accent colour</string>
+    <string name="keys_label">Key style</string>
+    <string name="screen_appearance">Appearance</string>
+    <string name="screen_appearance_desc">Themes, colour and key shape</string>
+    <string name="screen_typing">Typing</string>
+    <string name="screen_typing_desc">Suggestions, sound and feedback</string>
+    <string name="screen_languages">Languages</string>
+    <string name="screen_languages_desc">39 languages and writing modes</string>
+    <string name="screen_voice">Voice</string>
+    <string name="screen_voice_desc">Microphone, engine and tests</string>
+    <string name="screen_tools">Tools</string>
+    <string name="screen_tools_desc">Shortcuts, clipboard and learned words</string>
+    <string name="screen_backup">Backup</string>
+    <string name="screen_backup_desc">Export, import and reset</string>
+    <string name="screen_about">About</string>
+    <string name="screen_about_desc">Version, libraries and guide</string>
+    <string name="screen_backup_reset">Reset</string>
+    <string name="typing_feedback">Feedback</string>
+    <string name="typing_behavior">Typing behaviour</string>
+    <string name="typing_suggestions">Suggestions</string>
+    <string name="typing_height">Keyboard height</string>
+    <string name="typing_privacy">Privacy</string>
+    <string name="reset_all_desc">Erase every setting and start from the defaults. Shortcuts and clipboard are kept.</string>
 </resources>

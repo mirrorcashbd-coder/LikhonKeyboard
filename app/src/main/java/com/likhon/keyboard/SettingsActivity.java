@@ -35,6 +35,7 @@ import android.view.Window;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -72,7 +73,21 @@ public class SettingsActivity extends Activity {
 
     /** Opens settings straight at a section (the gear in the keyboard toolbar). */
     static final String EXTRA_PANEL = "panel";
+    static final String EXTRA_OPEN = "open_screen";
     static final String PANEL_EDITING = "editing";
+
+    private static final String SCREEN_HOME = "home";
+    private static final String SCREEN_APPEARANCE = "appearance";
+    private static final String SCREEN_TYPING = "typing";
+    private static final String SCREEN_LANGUAGES = "languages";
+    private static final String SCREEN_VOICE = "voice";
+    private static final String SCREEN_TOOLS = "tools";
+    private static final String SCREEN_BACKUP = "backup";
+    private static final String SCREEN_ABOUT = "about";
+
+    private FrameLayout screenHost;
+    private final java.util.LinkedHashMap<String, View> screens = new java.util.LinkedHashMap<>();
+    private final java.util.ArrayList<String> stack = new java.util.ArrayList<>();
 
     private TextView chipEnglish;
     private TextView chipBangla;
@@ -104,7 +119,19 @@ public class SettingsActivity extends Activity {
         setTheme(palette.dark ? R.style.Theme_Likhon_Dark : R.style.Theme_Likhon_Light);
         super.onCreate(savedInstanceState);
         configureWindow();
-        setContentView(buildContent());
+        screenHost = new FrameLayout(this);
+        screenHost.setBackgroundColor(palette.bgTop);
+        setContentView(screenHost);
+        buildScreens();
+        stack.add(SCREEN_HOME);
+        show(SCREEN_HOME, false);
+        String requested = getIntent().getStringExtra(EXTRA_OPEN);
+        getIntent().removeExtra(EXTRA_OPEN);
+        if (requested != null && screens.containsKey(requested)) {
+            open(requested);
+        } else if (PANEL_EDITING.equals(getIntent().getStringExtra(EXTRA_PANEL))) {
+            open(SCREEN_TYPING);
+        }
         refreshStatus();
         refreshVoiceStatus();
         if (getIntent().getBooleanExtra(EXTRA_REQUEST_MIC, false) && !hasMicPermission()) {
@@ -154,67 +181,59 @@ public class SettingsActivity extends Activity {
     }
 
     private void addAccentChips(LinearLayout parent) {
-        LinearLayout holder = Ui.vertical(this);
-        LinearLayout row = null;
+        LinearLayout row = Ui.horizontal(this);
         for (int i = 0; i < Palette.accentCount(); i++) {
-            if (i % 3 == 0) {
-                row = Ui.horizontal(this);
-                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT);
-                if (i > 0) {
-                    rowParams.topMargin = dp(8);
-                }
-                holder.addView(row, rowParams);
-            }
             final int index = i;
             boolean selected = prefs.accent() == i;
             int color = Palette.accentColor(i, palette.dark);
-            TextView chip = Ui.text(this, selected ? "\u2713" : "", 15,
-                    palette.dark ? 0xFF0A0E13 : 0xFFFFFFFF, true);
-            chip.setGravity(Gravity.CENTER);
-            chip.setPadding(0, dp(12), 0, dp(12));
-            chip.setBackground(Ui.ripple(this, color, 12, 0x55FFFFFF));
-            chip.setClickable(true);
-            chip.setOnClickListener(v -> {
-                prefs.raw().edit().putInt(Prefs.KEY_ACCENT, index).apply();
-                recreate();
-            });
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-            if (i % 3 != 0) {
-                params.leftMargin = dp(8);
+
+            FrameLayout cell = new FrameLayout(this);
+            FrameLayout dot = new FrameLayout(this);
+            GradientDrawable circle = new GradientDrawable();
+            circle.setShape(GradientDrawable.OVAL);
+            circle.setColor(color);
+            circle.setStroke(dp(selected ? 3 : 1), selected ? palette.text
+                    : Palette.mix(color, palette.surface, 0.4f));
+            GradientDrawable ovalMask = new GradientDrawable();
+            ovalMask.setShape(GradientDrawable.OVAL);
+            ovalMask.setColor(0xFFFFFFFF);
+            dot.setBackground(new android.graphics.drawable.RippleDrawable(
+                    android.content.res.ColorStateList.valueOf(0x44FFFFFF), circle, ovalMask));
+            dot.setElevation(dp(selected ? 3 : 1));
+
+            if (selected) {
+                double lum = 0.2126 * android.graphics.Color.red(color)
+                        + 0.7152 * android.graphics.Color.green(color)
+                        + 0.0722 * android.graphics.Color.blue(color);
+                TextView check = Ui.text(this, "\u2713", 15,
+                        lum > 140 ? 0xFF111111 : 0xFFFFFFFF, true);
+                check.setGravity(Gravity.CENTER);
+                dot.addView(check, new FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT));
             }
-            row.addView(chip, params);
+
+            dot.setClickable(true);
+            dot.setOnClickListener(v -> {
+                prefs.raw().edit().putInt(Prefs.KEY_ACCENT, index).apply();
+                recreateAt(SCREEN_APPEARANCE);
+            });
+            cell.addView(dot, new FrameLayout.LayoutParams(dp(40), dp(40), Gravity.CENTER));
+            row.addView(cell, new LinearLayout.LayoutParams(0, dp(46), 1f));
         }
-        addWithTopMargin(parent, holder, 10);
+        addWithTopMargin(parent, row, 4);
     }
 
     private void addChipGrid(LinearLayout parent, String[] labels, int selected,
                              IntAction action, int perRow, int topMarginDp) {
-        LinearLayout holder = Ui.vertical(this);
-        LinearLayout row = null;
-        for (int i = 0; i < labels.length; i++) {
-            if (i % perRow == 0) {
-                row = Ui.horizontal(this);
-                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT);
-                if (i > 0) {
-                    rowParams.topMargin = dp(8);
-                }
-                holder.addView(row, rowParams);
-            }
-            final int value = i;
-            TextView chip = makeChip(labels[i], selected == i, () -> action.run(value));
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-            if (i % perRow != 0) {
-                params.leftMargin = dp(8);
-            }
-            row.addView(chip, params);
-        }
-        addWithTopMargin(parent, holder, Math.max(0, topMarginDp));
+        CharSequence[] items = new CharSequence[labels.length];
+        System.arraycopy(labels, 0, items, 0, labels.length);
+        LinearLayout track = M3.segmented(this, palette, items, selected, action::run);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.topMargin = dp(Math.max(0, topMarginDp));
+        parent.addView(track, params);
     }
 
     private EditText smallField(String hint) {
@@ -225,8 +244,10 @@ public class SettingsActivity extends Activity {
         field.setHint(hint);
         field.setSingleLine(true);
         field.setInputType(InputType.TYPE_CLASS_TEXT);
-        field.setBackground(Ui.roundedStroke(this, palette.surfaceAlt, 10, palette.divider, 1));
-        field.setPadding(dp(10), dp(8), dp(10), dp(8));
+        GradientDrawable bg = Ui.rounded(this, M3.surfaceLow(palette), 14);
+        bg.setStroke(dp(1), M3.outlineVariant(palette));
+        field.setBackground(bg);
+        field.setPadding(dp(12), dp(10), dp(12), dp(10));
         return field;
     }
 
@@ -320,9 +341,11 @@ public class SettingsActivity extends Activity {
             });
             chip.setTextSize(12);
             chip.setSingleLine(true);
+            chip.setEllipsize(android.text.TextUtils.TruncateAt.END);
             if (active) {
                 chip.setTextColor(palette.onAccent);
-                chip.setBackground(Ui.ripple(this, palette.accent, 12, 0x40FFFFFF));
+                chip.setBackground(Ui.ripple(this, palette.accent, 15, 0x33FFFFFF));
+                chip.setElevation(dp(2));
             }
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
@@ -367,7 +390,7 @@ public class SettingsActivity extends Activity {
 
     private void configureWindow() {
         Window window = getWindow();
-        window.setStatusBarColor(palette.bg);
+        window.setStatusBarColor(palette.bgTop);
         window.setNavigationBarColor(palette.bg);
         View decor = window.getDecorView();
         int flags = decor.getSystemUiVisibility();
@@ -389,63 +412,115 @@ public class SettingsActivity extends Activity {
         return Ui.dp(this, value);
     }
 
-    private View buildContent() {
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFillViewport(true);
-        if (palette.hasGradient()) {
-            scroll.setBackground(new GradientDrawable(
-                    GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{palette.bgTop, palette.bgBottom}));
-        } else {
-            scroll.setBackgroundColor(palette.bg);
+    // ------------------------------------------------------- screens & flow
+
+    private View subScreen(int titleRes, int subtitleRes, LinearLayout body) {
+        return M3.screen(this, palette, M3.topBar(this, palette,
+                getString(titleRes), getString(subtitleRes), this::goBack, false), body);
+    }
+
+    private void addCard(LinearLayout body, View card) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.topMargin = dp(10);
+        body.addView(card, params);
+    }
+
+    private void addTileRow(LinearLayout grid, View left, View right) {
+        LinearLayout row = Ui.horizontal(this);
+        LinearLayout.LayoutParams leftParams = new LinearLayout.LayoutParams(
+                0, dp(126), 1f);
+        LinearLayout.LayoutParams rightParams = new LinearLayout.LayoutParams(
+                0, dp(126), 1f);
+        rightParams.leftMargin = dp(10);
+        row.addView(left, leftParams);
+        row.addView(right, rightParams);
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        if (grid.getChildCount() > 0) {
+            rowParams.topMargin = dp(10);
         }
-        scroll.setClipToPadding(false);
+        grid.addView(row, rowParams);
+    }
 
-        LinearLayout root = Ui.vertical(this);
-        root.setPadding(dp(18), dp(20), dp(18), dp(36));
-        scroll.addView(root, new ScrollView.LayoutParams(
-                ScrollView.LayoutParams.MATCH_PARENT,
-                ScrollView.LayoutParams.WRAP_CONTENT));
+    private void buildScreens() {
+        screens.put(SCREEN_HOME, buildHomeScreen());
+        screens.put(SCREEN_APPEARANCE, buildAppearanceScreen());
+        screens.put(SCREEN_TYPING, buildTypingScreen());
+        screens.put(SCREEN_LANGUAGES, buildLanguagesScreen());
+        screens.put(SCREEN_VOICE, buildVoiceScreen());
+        screens.put(SCREEN_TOOLS, buildToolsScreen());
+        screens.put(SCREEN_BACKUP, buildBackupScreen());
+        screens.put(SCREEN_ABOUT, buildAboutScreen());
+    }
 
-        // ------------------------------------------------------------ header
-        LinearLayout hero = new LinearLayout(this);
-        hero.setOrientation(LinearLayout.HORIZONTAL);
-        hero.setGravity(Gravity.CENTER_VERTICAL);
-        hero.setPadding(dp(18), dp(18), dp(16), dp(18));
-        GradientDrawable heroBg = new GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                new int[]{palette.accent, palette.accentPressed});
-        heroBg.setCornerRadius(dp(22));
-        hero.setBackground(heroBg);
+    private void show(String key, boolean animate) {
+        View next = screens.get(key);
+        if (next == null) {
+            return;
+        }
+        screenHost.removeAllViews();
+        screenHost.addView(next, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+        if (animate) {
+            next.setAlpha(0f);
+            next.setTranslationX(dp(26));
+            next.animate().alpha(1f).translationX(0f).setDuration(190).start();
+        }
+    }
 
-        ImageView icon = new ImageView(this);
-        icon.setImageResource(R.mipmap.ic_launcher);
-        icon.setBackground(Ui.rounded(this, 0x33FFFFFF, 16));
-        icon.setPadding(dp(8), dp(8), dp(8), dp(8));
-        hero.addView(icon, new LinearLayout.LayoutParams(dp(56), dp(56)));
+    private void open(String key) {
+        if (!stack.isEmpty() && stack.get(stack.size() - 1).equals(key)) {
+            return;
+        }
+        stack.add(key);
+        show(key, true);
+    }
 
-        LinearLayout headings = Ui.vertical(this);
-        headings.setPadding(dp(14), 0, 0, 0);
-        TextView name = Ui.text(this, getString(R.string.app_name), 22, palette.onAccent, true);
-        int faded = (palette.onAccent & 0x00FFFFFF) | 0xB3000000;
-        TextView tagline = Ui.text(this, getString(R.string.tagline), 12.5f, faded, false);
-        tagline.setPadding(0, dp(4), 0, 0);
-        headings.addView(name);
-        headings.addView(tagline);
-        hero.addView(headings, new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+    /** Rebuild after a preference change, then come back to the same screen. */
+    private void recreateAt(String screen) {
+        getIntent().putExtra(EXTRA_OPEN, screen);
+        recreate();
+    }
 
-        TextView versionPill = Ui.text(this, getString(R.string.hero_version), 11,
-                palette.onAccent, true);
-        versionPill.setPadding(dp(10), dp(5), dp(10), dp(5));
-        versionPill.setBackground(Ui.rounded(this,
-                Palette.mix(palette.accent, palette.onAccent, 0.18f), 20));
-        hero.addView(versionPill);
+    private void goBack() {
+        if (stack.size() <= 1) {
+            finish();
+            return;
+        }
+        stack.remove(stack.size() - 1);
+        View previous = screens.get(stack.get(stack.size() - 1));
+        if (previous == null) {
+            return;
+        }
+        screenHost.removeAllViews();
+        screenHost.addView(previous, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+        previous.setAlpha(0f);
+        previous.setTranslationX(-dp(20));
+        previous.animate().alpha(1f).translationX(0f).setDuration(170).start();
+    }
 
-        addWithTopMargin(root, hero, 0);
+    @Override
+    public void onBackPressed() {
+        if (stack.size() > 1) {
+            goBack();
+            return;
+        }
+        super.onBackPressed();
+    }
 
-        // ------------------------------------------------------ status card
-        LinearLayout statusCard = Ui.card(this, palette);
+    // ------------------------------------------------------------ home screen
+
+    private View buildHomeScreen() {
+        LinearLayout body = M3.body(this);
+
+        // ------------------------------------------------------- status card
+        LinearLayout statusCard = M3.card(this, palette);
         LinearLayout statusTop = Ui.horizontal(this);
         statusDot = Ui.dot(this, palette.textMuted, 10);
         statusTop.addView(statusDot);
@@ -456,15 +531,15 @@ public class SettingsActivity extends Activity {
         statusTop.addView(statusTitle, titleParams);
         statusCard.addView(statusTop);
 
-        statusBody = Ui.text(this, "", 13, palette.textMuted, false);
+        statusBody = Ui.text(this, "", 12.5f, palette.textMuted, false);
         statusBody.setPadding(0, dp(8), 0, 0);
         statusCard.addView(statusBody);
 
         LinearLayout buttons = Ui.horizontal(this);
-        enableButton = Ui.button(this, palette, getString(R.string.action_enable), false,
-                this::openKeyboardSettings);
-        chooseButton = Ui.button(this, palette, getString(R.string.action_choose), true,
-                this::showKeyboardPicker);
+        enableButton = M3.tonalButton(this, palette,
+                getString(R.string.action_enable), this::openKeyboardSettings);
+        chooseButton = M3.filledButton(this, palette,
+                getString(R.string.action_choose), this::showKeyboardPicker);
         LinearLayout.LayoutParams first = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         first.rightMargin = dp(8);
@@ -472,14 +547,65 @@ public class SettingsActivity extends Activity {
         buttons.addView(chooseButton, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         LinearLayout.LayoutParams buttonsParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
         buttonsParams.topMargin = dp(16);
         statusCard.addView(buttons, buttonsParams);
-        addWithTopMargin(root, statusCard, 18);
+        body.addView(statusCard);
 
-        // --------------------------------------------------------- try card
-        LinearLayout tryCard = Ui.card(this, palette);
-        TextView tryTitle = Ui.text(this, getString(R.string.try_title), 15, palette.text, true);
+        // ------------------------------------------------------ quick tiles
+        body.addView(M3.sectionLabel(this, palette, getString(R.string.home_quick)));
+        LinearLayout grid = Ui.vertical(this);
+        addTileRow(grid,
+                M3.tile(this, palette, R.drawable.ic_droplet,
+                        getString(R.string.section_appearance),
+                        getString(R.string.tile_appearance_sub),
+                        () -> open(SCREEN_APPEARANCE)),
+                M3.tile(this, palette, R.drawable.ic_keyboard,
+                        getString(R.string.section_typing),
+                        getString(R.string.tile_typing_sub),
+                        () -> open(SCREEN_TYPING)));
+        addTileRow(grid,
+                M3.tile(this, palette, R.drawable.ic_globe,
+                        getString(R.string.section_languages),
+                        getString(R.string.tile_languages_sub),
+                        () -> open(SCREEN_LANGUAGES)),
+                M3.tile(this, palette, R.drawable.ic_mic,
+                        getString(R.string.section_voice),
+                        getString(R.string.tile_voice_sub),
+                        () -> open(SCREEN_VOICE)));
+        addTileRow(grid,
+                M3.tile(this, palette, R.drawable.ic_tune,
+                        getString(R.string.screen_tools),
+                        getString(R.string.tile_tools_sub),
+                        () -> open(SCREEN_TOOLS)),
+                M3.tile(this, palette, R.drawable.ic_archive,
+                        getString(R.string.section_backup),
+                        getString(R.string.tile_backup_sub),
+                        () -> open(SCREEN_BACKUP)));
+        body.addView(grid);
+
+        // ---------------------------------------------------------- more rows
+        body.addView(M3.sectionLabel(this, palette, getString(R.string.home_more)));
+        LinearLayout more = M3.bareCard(this, palette);
+        more.setPadding(dp(6), dp(6), dp(6), dp(6));
+        more.addView(M3.navRow(this, palette, R.drawable.ic_info,
+                getString(R.string.guide_title), getString(R.string.home_guide_sub),
+                this::showGuide));
+        more.addView(M3.divider(this, palette));
+        more.addView(M3.navRow(this, palette, R.drawable.ic_keyboard,
+                getString(R.string.home_keyboard), getString(R.string.home_keyboard_sub),
+                this::openKeyboardSettings));
+        more.addView(M3.divider(this, palette));
+        more.addView(M3.navRow(this, palette, R.drawable.ic_settings,
+                getString(R.string.section_about), getString(R.string.about_short),
+                () -> open(SCREEN_ABOUT)));
+        addCard(body, more);
+
+        // ------------------------------------------------------- try-it card
+        LinearLayout tryCard = M3.card(this, palette);
+        TextView tryTitle = Ui.text(this, getString(R.string.try_title), 14.5f,
+                palette.text, true);
         tryCard.addView(tryTitle);
 
         EditText field = new EditText(this);
@@ -492,29 +618,181 @@ public class SettingsActivity extends Activity {
         field.setMinHeight(dp(58));
         field.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
                 | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-        field.setBackground(Ui.roundedStroke(this, palette.surfaceAlt, 14, palette.divider, 1));
+        GradientDrawable fieldBg = Ui.rounded(this, M3.surfaceLow(palette), 16);
+        fieldBg.setStroke(dp(1), M3.outlineVariant(palette));
+        field.setBackground(fieldBg);
         field.setPadding(dp(14), dp(12), dp(14), dp(12));
         LinearLayout.LayoutParams fieldParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
         fieldParams.topMargin = dp(12);
         tryCard.addView(field, fieldParams);
-        addWithTopMargin(root, tryCard, 12);
+        addCard(body, tryCard);
 
-        // ------------------------------------------------------- input card
-        LinearLayout inputCard = Ui.card(this, palette);
+        return M3.screen(this, palette, M3.topBar(this, palette,
+                getString(R.string.app_name), getString(R.string.tagline), null, true), body);
+    }
+
+    // ------------------------------------------------------ appearance screen
+
+    private View buildAppearanceScreen() {
+        LinearLayout body = M3.body(this);
+
+        LinearLayout themeCard = M3.card(this, palette);
+        themeChips = Ui.vertical(this);
+        themeCard.addView(themeChips);
+
+        ThemePreviewView preview = new ThemePreviewView(this);
+        preview.setPalette(palette);
+        LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(118));
+        previewParams.topMargin = dp(14);
+        themeCard.addView(preview, previewParams);
+        rebuildThemeChips();
+        body.addView(M3.sectionLabel(this, palette, getString(R.string.theme_label)));
+        body.addView(themeCard);
+
+        LinearLayout accentCard = M3.card(this, palette);
+        addAccentChips(accentCard);
+        addSection(body, getString(R.string.accent_section), null, accentCard);
+
+        LinearLayout keysCard = M3.card(this, palette);
+        TextView shapeLabel = Ui.text(this, getString(R.string.key_shape), 13,
+                palette.text, true);
+        keysCard.addView(shapeLabel);
+        addChipGrid(keysCard, new String[]{
+                getString(R.string.shape_square),
+                getString(R.string.shape_rounded),
+                getString(R.string.shape_pill)}, prefs.keyShape(), value -> {
+            prefs.setKeyShape(value);
+            recreateAt(SCREEN_APPEARANCE);
+        }, 3, 10);
+
+        TextView sizeLabel = Ui.text(this, getString(R.string.label_size), 13,
+                palette.text, true);
+        sizeLabel.setPadding(0, dp(18), 0, 0);
+        keysCard.addView(sizeLabel);
+        addChipGrid(keysCard, new String[]{
+                getString(R.string.size_small),
+                getString(R.string.size_normal),
+                getString(R.string.size_large)}, prefs.labelSize(), value -> {
+            prefs.setLabelSize(value);
+            recreateAt(SCREEN_APPEARANCE);
+        }, 3, 10);
+
+        TextView gapLabel = Ui.text(this, getString(R.string.key_gap), 13,
+                palette.text, true);
+        gapLabel.setPadding(0, dp(18), 0, 0);
+        keysCard.addView(gapLabel);
+        int gapIndex = prefs.keyGap() < 5f ? 0 : (prefs.keyGap() > 7.5f ? 2 : 1);
+        addChipGrid(keysCard, new String[]{
+                getString(R.string.gap_compact),
+                getString(R.string.gap_normal),
+                getString(R.string.gap_airy)}, gapIndex, value -> {
+            prefs.setKeyGap(value);
+            recreateAt(SCREEN_APPEARANCE);
+        }, 3, 10);
+
+        addSwitchRow(keysCard, R.string.opt_borders, R.string.opt_borders_desc,
+                Prefs.KEY_KEY_BORDERS, prefs.keyBorders());
+        addSection(body, getString(R.string.keys_label), null, keysCard);
+
+        return subScreen(R.string.screen_appearance, R.string.screen_appearance_desc, body);
+    }
+
+    // --------------------------------------------------------- typing screen
+
+    private View buildTypingScreen() {
+        LinearLayout body = M3.body(this);
+
+        LinearLayout feedback = M3.card(this, palette);
+        addSwitchRow(feedback, R.string.opt_haptic, R.string.opt_haptic_desc,
+                Prefs.KEY_HAPTIC, prefs.haptic());
+        addSwitchRow(feedback, R.string.opt_sound, R.string.opt_sound_desc,
+                Prefs.KEY_SOUND, prefs.sound());
+        addSection(body, getString(R.string.typing_feedback), null, feedback);
+
+        LinearLayout typing = M3.card(this, palette);
+        addSwitchRow(typing, R.string.opt_autocap, R.string.opt_autocap_desc,
+                Prefs.KEY_AUTOCAP, prefs.autoCap());
+        addSwitchRow(typing, R.string.opt_hints, R.string.opt_hints_desc,
+                Prefs.KEY_HINTS, prefs.hints());
+        addSwitchRow(typing, R.string.opt_popup, R.string.opt_popup_desc,
+                Prefs.KEY_POPUP, prefs.showPopup());
+        addSwitchRow(typing, R.string.opt_number_row, R.string.opt_number_row_desc,
+                Prefs.KEY_NUMBER_ROW, prefs.numberRow());
+        addSwitchRow(typing, R.string.opt_double_space, R.string.opt_double_space_desc,
+                Prefs.KEY_DOUBLE_SPACE, prefs.doubleSpace());
+        addSection(body, getString(R.string.typing_behavior), null, typing);
+
+        LinearLayout suggestions = M3.card(this, palette);
+        addSwitchRow(suggestions, R.string.opt_suggestions, R.string.opt_suggestions_desc,
+                Prefs.KEY_SUGGESTIONS, prefs.suggestionsEnabled());
+        TextView countLabel = Ui.text(this, getString(R.string.suggestion_count), 13,
+                palette.text, true);
+        countLabel.setPadding(0, dp(18), 0, 0);
+        suggestions.addView(countLabel);
+        addChipGrid(suggestions, new String[]{"4", "6", "8"}, prefs.suggestionCount() == 4
+                ? 0 : (prefs.suggestionCount() == 8 ? 2 : 1), value -> {
+            prefs.setSuggestionCount(value == 0 ? 4 : (value == 2 ? 8 : 6));
+            recreateAt(SCREEN_TYPING);
+        }, 3, 10);
+        addSection(body, getString(R.string.typing_suggestions), null, suggestions);
+
+        LinearLayout height = M3.card(this, palette);
+        TextView heightLabel = Ui.text(this, getString(R.string.height_preset), 13,
+                palette.text, true);
+        height.addView(heightLabel);
+        float scale = prefs.heightScale();
+        int preset = scale < 0.94f ? 0 : (scale > 1.06f ? 2 : 1);
+        addChipGrid(height, new String[]{
+                getString(R.string.size_compact),
+                getString(R.string.size_normal),
+                getString(R.string.size_tall)}, preset, value -> {
+            prefs.setHeightScale(value == 0 ? 0.88f : (value == 2 ? 1.14f : 1f));
+            Toast.makeText(this, R.string.height_applied, Toast.LENGTH_SHORT).show();
+        }, 3, 10);
+
+        LinearLayout heightRow = Ui.horizontal(this);
+        TextView resetLabel = Ui.text(this, getString(R.string.reset_height), 13,
+                palette.textMuted, false);
+        resetLabel.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        heightRow.addView(resetLabel);
+        heightRow.addView(M3.tonalButton(this, palette,
+                getString(R.string.reset_height), () -> prefs.setHeightScale(1f)));
+        addWithTopMargin(height, heightRow, 14);
+        addSection(body, getString(R.string.typing_height), null, height);
+
+        LinearLayout privacy = M3.card(this, palette);
+        addSwitchRow(privacy, R.string.opt_incognito, R.string.opt_incognito_desc,
+                Prefs.KEY_INCOGNITO, prefs.incognito());
+        addSection(body, getString(R.string.typing_privacy), null, privacy);
+
+        return subScreen(R.string.screen_typing, R.string.screen_typing_desc, body);
+    }
+
+    // ------------------------------------------------------ languages screen
+
+    private View buildLanguagesScreen() {
+        LinearLayout body = M3.body(this);
+
+        LinearLayout inputCard = M3.card(this, palette);
         LinearLayout languageRow = Ui.horizontal(this);
-        chipEnglish = makeChip(getString(R.string.lang_english), "en".equals(prefs.language()), () -> {
-            prefs.setLanguage("en");
-            prefs.setLanguageEnabled("en", true);
-            updateLanguageChips();
-            rebuildLanguageChips();
-        });
-        chipBangla = makeChip(getString(R.string.lang_bangla), "bn".equals(prefs.language()), () -> {
-            prefs.setLanguage("bn");
-            prefs.setLanguageEnabled("bn", true);
-            updateLanguageChips();
-            rebuildLanguageChips();
-        });
+        chipEnglish = M3.chip(this, palette, getString(R.string.lang_english),
+                "en".equals(prefs.language()), () -> {
+                    prefs.setLanguage("en");
+                    prefs.setLanguageEnabled("en", true);
+                    updateLanguageChips();
+                    rebuildLanguageChips();
+                });
+        chipBangla = M3.chip(this, palette, getString(R.string.lang_bangla),
+                "bn".equals(prefs.language()), () -> {
+                    prefs.setLanguage("bn");
+                    prefs.setLanguageEnabled("bn", true);
+                    updateLanguageChips();
+                    rebuildLanguageChips();
+                });
         LinearLayout.LayoutParams chipFirst = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         chipFirst.rightMargin = dp(8);
@@ -523,55 +801,43 @@ public class SettingsActivity extends Activity {
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         inputCard.addView(languageRow);
 
-        // ------------------------------------------------------ languages card
-        LinearLayout langCard = Ui.card(this, palette);
+        TextView languageHint = Ui.text(this, getString(R.string.lang_hint), 12,
+                palette.textMuted, false);
+        languageHint.setPadding(0, dp(12), 0, 0);
+        inputCard.addView(languageHint);
+        addSection(body, getString(R.string.section_input),
+                getString(R.string.section_input_desc), inputCard);
+
+        LinearLayout langCard = M3.card(this, palette);
         languageNow = Ui.text(this, "", 13, palette.text, true);
         langCard.addView(languageNow);
         langCard.addView(Ui.text(this, getString(R.string.languages_desc), 12,
                 palette.textMuted, false));
         languageChips = Ui.vertical(this);
-        addWithTopMargin(langCard, languageChips, 10);
-        addSection(root, getString(R.string.section_languages), null, langCard);
+        addWithTopMargin(langCard, languageChips, 12);
+        addSection(body, getString(R.string.section_languages), null, langCard);
         rebuildLanguageChips();
 
-        TextView languageHint = Ui.text(this, getString(R.string.lang_hint), 12,
-                palette.textMuted, false);
-        languageHint.setPadding(0, dp(10), 0, 0);
-        inputCard.addView(languageHint);
-        addSection(root, getString(R.string.section_input),
-                getString(R.string.section_input_desc), inputCard);
+        return subScreen(R.string.screen_languages, R.string.screen_languages_desc, body);
+    }
 
-        // -------------------------------------------------------- voice card
-        addSection(root, getString(R.string.section_voice),
+    // ---------------------------------------------------------- voice screen
+
+    private View buildVoiceScreen() {
+        LinearLayout body = M3.body(this);
+        addSection(body, getString(R.string.section_voice),
                 getString(R.string.section_voice_desc), buildVoiceCard());
+        return subScreen(R.string.screen_voice, R.string.screen_voice_desc, body);
+    }
 
-        // ----------------------------------------------------- editing card
-        LinearLayout editingCard = Ui.card(this, palette);
-        TextView editingNote = Ui.text(this, getString(R.string.settings_editing_desc), 13,
-                palette.textMuted, false);
-        editingCard.addView(editingNote);
-        addSection(root, getString(R.string.settings_editing), null, editingCard);
+    // ---------------------------------------------------------- tools screen
 
-        // --------------------------------------------------- clipboard card
-        LinearLayout clipCard = Ui.card(this, palette);
-        TextView clipNote = Ui.text(this, getString(R.string.settings_clipboard_desc), 13,
-                palette.textMuted, false);
-        clipCard.addView(clipNote);
-        LinearLayout clipRow = Ui.horizontal(this);
-        clipStoreCount = Ui.text(this, "", 13, palette.text, true);
-        clipStoreCount.setLayoutParams(new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        clipRow.addView(clipStoreCount);
-        clipRow.addView(Ui.button(this, palette,
-                getString(R.string.settings_clipboard_clear), false,
-                this::confirmClearClipStore));
-        addWithTopMargin(clipCard, clipRow, 14);
-        addSection(root, getString(R.string.settings_clipboard), null, clipCard);
-        refreshClipStore();
+    private View buildToolsScreen() {
+        LinearLayout body = M3.body(this);
 
         // ---------------------------------------------------- shortcuts card
-        LinearLayout shortcutCard = Ui.card(this, palette);
-        shortcutCard.addView(Ui.text(this, getString(R.string.shortcuts_desc), 13,
+        LinearLayout shortcutCard = M3.card(this, palette);
+        shortcutCard.addView(Ui.text(this, getString(R.string.shortcuts_desc), 12,
                 palette.textMuted, false));
         LinearLayout shortcutRow = Ui.horizontal(this);
         shortcutKeyInput = smallField(getString(R.string.shortcuts_key_hint));
@@ -585,195 +851,135 @@ public class SettingsActivity extends Activity {
         shortcutValueInput.setLayoutParams(valueParams);
         shortcutRow.addView(shortcutKeyInput);
         shortcutRow.addView(shortcutValueInput);
-        shortcutRow.addView(Ui.button(this, palette,
-                getString(R.string.shortcuts_add), true, this::addShortcut));
+        shortcutRow.addView(M3.filledButton(this, palette,
+                getString(R.string.shortcuts_add), this::addShortcut));
         addWithTopMargin(shortcutCard, shortcutRow, 12);
         shortcutList = Ui.vertical(this);
         addWithTopMargin(shortcutCard, shortcutList, 12);
-        addSection(root, getString(R.string.section_shortcuts), null, shortcutCard);
+        addSection(body, getString(R.string.section_shortcuts), null, shortcutCard);
         rebuildShortcutList();
 
+        // --------------------------------------------------- clipboard card
+        LinearLayout clipCard = M3.card(this, palette);
+        TextView clipNote = Ui.text(this, getString(R.string.settings_clipboard_desc), 12,
+                palette.textMuted, false);
+        clipCard.addView(clipNote);
+        LinearLayout clipRow = Ui.horizontal(this);
+        clipStoreCount = Ui.text(this, "", 13, palette.text, true);
+        clipStoreCount.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        clipRow.addView(clipStoreCount);
+        clipRow.addView(M3.tonalButton(this, palette,
+                getString(R.string.settings_clipboard_clear), this::confirmClearClipStore));
+        addWithTopMargin(clipCard, clipRow, 14);
+        addSection(body, getString(R.string.settings_clipboard), null, clipCard);
+        refreshClipStore();
+
         // ------------------------------------------------- learned words card
-        LinearLayout learnedCard = Ui.card(this, palette);
+        LinearLayout learnedCard = M3.card(this, palette);
         LinearLayout learnedRow = Ui.horizontal(this);
         learnedCount = Ui.text(this, "", 13, palette.text, true);
         learnedCount.setLayoutParams(new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         learnedRow.addView(learnedCount);
-        learnedRow.addView(Ui.button(this, palette, getString(R.string.learned_clear),
-                false, this::confirmClearLearned));
+        learnedRow.addView(M3.tonalButton(this, palette, getString(R.string.learned_clear),
+                this::confirmClearLearned));
         learnedCard.addView(learnedRow);
         learnedCard.addView(Ui.text(this, getString(R.string.learned_desc), 12,
                 palette.textMuted, false));
-        addSection(root, getString(R.string.section_learned), null, learnedCard);
+        addSection(body, getString(R.string.section_learned), null, learnedCard);
         refreshLearnedCount();
 
-        // -------------------------------------------------- appearance card
-        LinearLayout themeCard = Ui.card(this, palette);
-        themeChips = Ui.vertical(this);
-        themeCard.addView(themeChips);
+        // ---------------------------------------------------- editing card
+        LinearLayout editingCard = M3.card(this, palette);
+        editingCard.addView(Ui.text(this, getString(R.string.settings_editing_desc), 12.5f,
+                palette.textMuted, false));
+        addSection(body, getString(R.string.settings_editing), null, editingCard);
 
-        ThemePreviewView preview = new ThemePreviewView(this);
-        preview.setPalette(palette);
-        LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(118));
-        previewParams.topMargin = dp(12);
-        themeCard.addView(preview, previewParams);
+        return subScreen(R.string.screen_tools, R.string.screen_tools_desc, body);
+    }
 
-        TextView accentLabel = Ui.text(this, getString(R.string.accent), 13,
-                palette.text, true);
-        themeCard.addView(accentLabel);
-        addAccentChips(themeCard);
+    // --------------------------------------------------------- backup screen
 
-        TextView shapeLabel = Ui.text(this, getString(R.string.key_shape), 13,
-                palette.text, true);
-        shapeLabel.setPadding(0, dp(18), 0, dp(8));
-        themeCard.addView(shapeLabel);
-        addChipGrid(themeCard, new String[]{
-                getString(R.string.shape_square),
-                getString(R.string.shape_rounded),
-                getString(R.string.shape_pill)}, prefs.keyShape(), value -> {
-            prefs.setKeyShape(value);
-            recreate();
-        }, 3, 0);
+    private View buildBackupScreen() {
+        LinearLayout body = M3.body(this);
 
-        TextView sizeLabel = Ui.text(this, getString(R.string.label_size), 13,
-                palette.text, true);
-        sizeLabel.setPadding(0, dp(18), 0, dp(8));
-        themeCard.addView(sizeLabel);
-        addChipGrid(themeCard, new String[]{
-                getString(R.string.size_small),
-                getString(R.string.size_normal),
-                getString(R.string.size_large)}, prefs.labelSize(), value -> {
-            prefs.setLabelSize(value);
-            recreate();
-        }, 3, 0);
-
-        TextView gapLabel = Ui.text(this, getString(R.string.key_gap), 13,
-                palette.text, true);
-        gapLabel.setPadding(0, dp(18), 0, dp(8));
-        themeCard.addView(gapLabel);
-        int gapIndex = prefs.keyGap() < 5f ? 0 : (prefs.keyGap() > 7.5f ? 2 : 1);
-        addChipGrid(themeCard, new String[]{
-                getString(R.string.gap_compact),
-                getString(R.string.gap_normal),
-                getString(R.string.gap_airy)}, gapIndex, value -> {
-            prefs.setKeyGap(value);
-            recreate();
-        }, 3, 0);
-
-        addSwitchRow(themeCard, R.string.opt_borders, R.string.opt_borders_desc,
-                Prefs.KEY_KEY_BORDERS, prefs.keyBorders());
-        addSection(root, getString(R.string.section_appearance), null, themeCard);
-        rebuildThemeChips();
-
-        // ------------------------------------------------------ typing card
-        LinearLayout typingCard = Ui.card(this, palette);
-        addSwitchRow(typingCard, R.string.opt_haptic, R.string.opt_haptic_desc,
-                Prefs.KEY_HAPTIC, prefs.haptic());
-        addSwitchRow(typingCard, R.string.opt_sound, R.string.opt_sound_desc,
-                Prefs.KEY_SOUND, prefs.sound());
-        addSwitchRow(typingCard, R.string.opt_autocap, R.string.opt_autocap_desc,
-                Prefs.KEY_AUTOCAP, prefs.autoCap());
-        addSwitchRow(typingCard, R.string.opt_hints, R.string.opt_hints_desc,
-                Prefs.KEY_HINTS, prefs.hints());
-        addSwitchRow(typingCard, R.string.opt_popup, R.string.opt_popup_desc,
-                Prefs.KEY_POPUP, prefs.showPopup());
-        addSwitchRow(typingCard, R.string.opt_number_row, R.string.opt_number_row_desc,
-                Prefs.KEY_NUMBER_ROW, prefs.numberRow());
-        addSwitchRow(typingCard, R.string.opt_double_space, R.string.opt_double_space_desc,
-                Prefs.KEY_DOUBLE_SPACE, prefs.doubleSpace());
-        addSwitchRow(typingCard, R.string.opt_suggestions, R.string.opt_suggestions_desc,
-                Prefs.KEY_SUGGESTIONS, prefs.suggestionsEnabled());
-        addSwitchRow(typingCard, R.string.opt_incognito, R.string.opt_incognito_desc,
-                Prefs.KEY_INCOGNITO, prefs.incognito());
-
-        TextView countLabel = Ui.text(this, getString(R.string.suggestion_count), 13,
-                palette.text, true);
-        countLabel.setPadding(0, dp(18), 0, dp(8));
-        typingCard.addView(countLabel);
-        addChipGrid(typingCard, new String[]{"4", "6", "8"}, prefs.suggestionCount() == 4
-                ? 0 : (prefs.suggestionCount() == 8 ? 2 : 1), value -> {
-            prefs.setSuggestionCount(value == 0 ? 4 : (value == 2 ? 8 : 6));
-            recreate();
-        }, 3, 0);
-
-        TextView heightPreset = Ui.text(this, getString(R.string.height_preset), 13,
-                palette.text, true);
-        heightPreset.setPadding(0, dp(18), 0, dp(8));
-        typingCard.addView(heightPreset);
-        float scale = prefs.heightScale();
-        int preset = scale < 0.94f ? 0 : (scale > 1.06f ? 2 : 1);
-        addChipGrid(typingCard, new String[]{
-                getString(R.string.size_compact),
-                getString(R.string.size_normal),
-                getString(R.string.size_tall)}, preset, value -> {
-            prefs.setHeightScale(value == 0 ? 0.88f : (value == 2 ? 1.14f : 1f));
-            Toast.makeText(this, R.string.height_applied, Toast.LENGTH_SHORT).show();
-        }, 3, 0);
-
-        LinearLayout heightRow = Ui.horizontal(this);
-        TextView heightLabel = Ui.text(this, getString(R.string.reset_height), 13,
-                palette.text, true);
-        heightLabel.setLayoutParams(new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        heightRow.addView(heightLabel);
-        heightRow.addView(Ui.button(this, palette, getString(R.string.reset_height), false,
-                () -> prefs.setHeightScale(1f)));
-        addWithTopMargin(typingCard, heightRow, 14);
-        addSection(root, getString(R.string.section_typing), null, typingCard);
-
-        // ------------------------------------------------------ backup card
-        LinearLayout backupCard = Ui.card(this, palette);
-        backupCard.addView(Ui.text(this, getString(R.string.backup_desc), 13,
+        LinearLayout backupCard = M3.card(this, palette);
+        backupCard.addView(Ui.text(this, getString(R.string.backup_desc), 12.5f,
                 palette.textMuted, false));
         LinearLayout backupRow = Ui.horizontal(this);
-        backupRow.addView(Ui.button(this, palette, getString(R.string.backup_export),
-                true, this::exportBackup));
+        backupRow.addView(M3.filledButton(this, palette,
+                getString(R.string.backup_export), this::exportBackup));
         LinearLayout.LayoutParams importParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
         importParams.leftMargin = dp(8);
-        TextView importButton = Ui.button(this, palette, getString(R.string.backup_import),
-                false, this::importBackup);
-        backupRow.addView(importButton, importParams);
-        addWithTopMargin(backupCard, backupRow, 12);
-        addSection(root, getString(R.string.section_backup), null, backupCard);
+        backupRow.addView(M3.tonalButton(this, palette,
+                getString(R.string.backup_import), this::importBackup), importParams);
+        addWithTopMargin(backupCard, backupRow, 14);
+        addSection(body, getString(R.string.section_backup), null, backupCard);
 
-        // ------------------------------------------------------- about card
-        LinearLayout aboutCard = Ui.card(this, palette);
-        TextView about = Ui.text(this, getString(R.string.about_body), 13,
+        LinearLayout resetCard = M3.card(this, palette);
+        LinearLayout resetRow = Ui.horizontal(this);
+        TextView resetNote = Ui.text(this, getString(R.string.reset_all_desc), 12,
                 palette.textMuted, false);
+        LinearLayout.LayoutParams resetNoteParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        resetNoteParams.rightMargin = dp(12);
+        resetRow.addView(resetNote, resetNoteParams);
+        resetRow.addView(M3.tonalButton(this, palette,
+                getString(R.string.reset_all), this::confirmResetAll));
+        resetCard.addView(resetRow);
+        addSection(body, getString(R.string.screen_backup_reset), null, resetCard);
+
+        return subScreen(R.string.screen_backup, R.string.screen_backup_desc, body);
+    }
+
+    // ---------------------------------------------------------- about screen
+
+    private View buildAboutScreen() {
+        LinearLayout body = M3.body(this);
+
+        LinearLayout aboutCard = M3.card(this, palette);
+        LinearLayout identity = Ui.horizontal(this);
+        FrameLayout badge = new FrameLayout(this);
+        M3.applySurface(this, badge, palette, 18, 2f);
+        ImageView app = new ImageView(this);
+        app.setImageResource(R.mipmap.ic_launcher);
+        badge.addView(app, new FrameLayout.LayoutParams(dp(52), dp(52), Gravity.CENTER));
+        LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(dp(58), dp(58));
+        badgeParams.rightMargin = dp(14);
+        identity.addView(badge, badgeParams);
+        LinearLayout names = Ui.vertical(this);
+        names.addView(Ui.text(this, getString(R.string.app_name), 17, palette.text, true));
+        names.addView(Ui.text(this, getString(R.string.about_version) + "  ·  "
+                + getString(R.string.footer), 11.5f, palette.textMuted, false));
+        identity.addView(names);
+        aboutCard.addView(identity);
+
+        TextView about = Ui.text(this, getString(R.string.about_body), 12.5f,
+                palette.textMuted, false);
+        about.setPadding(0, dp(16), 0, 0);
         aboutCard.addView(about);
 
-        TextView guide = Ui.text(this, getString(R.string.about_guide), 14, palette.accent, true);
-        guide.setPadding(0, dp(16), 0, dp(4));
-        guide.setClickable(true);
-        guide.setBackground(Ui.ripple(this, Color.TRANSPARENT, 10, palette.keyStroke));
-        guide.setOnClickListener(v -> showGuide());
-        aboutCard.addView(guide);
-
-        LinearLayout resetRow = Ui.horizontal(this);
-        TextView resetLabel = Ui.text(this, getString(R.string.reset_all), 13,
-                palette.text, true);
-        resetLabel.setLayoutParams(new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        resetRow.addView(resetLabel);
-        resetRow.addView(Ui.button(this, palette, getString(R.string.reset_all), false,
-                this::confirmResetAll));
-        addWithTopMargin(aboutCard, resetRow, 18);
-
-        TextView version = Ui.text(this, getString(R.string.about_version) + "  ·  "
-                + getString(R.string.footer), 12, palette.textMuted, false);
-        version.setPadding(0, dp(10), 0, 0);
-        aboutCard.addView(version);
-
-        TextView libraries = Ui.text(this, getString(R.string.about_libraries), 12,
+        TextView libraries = Ui.text(this, getString(R.string.about_libraries), 11.5f,
                 palette.textMuted, false);
-        libraries.setPadding(0, dp(4), 0, 0);
+        libraries.setPadding(0, dp(10), 0, 0);
         aboutCard.addView(libraries);
-        addSection(root, getString(R.string.section_about), null, aboutCard);
+        addSection(body, getString(R.string.section_about), null, aboutCard);
 
-        return scroll;
+        LinearLayout links = M3.bareCard(this, palette);
+        links.setPadding(dp(6), dp(6), dp(6), dp(6));
+        links.addView(M3.navRow(this, palette, R.drawable.ic_info,
+                getString(R.string.guide_title), getString(R.string.home_guide_sub),
+                this::showGuide));
+        links.addView(M3.divider(this, palette));
+        links.addView(M3.navRow(this, palette, R.drawable.ic_keyboard,
+                getString(R.string.home_keyboard), getString(R.string.home_keyboard_sub),
+                this::openKeyboardSettings));
+        addCard(body, links);
+
+        return subScreen(R.string.screen_about, R.string.screen_about_desc, body);
     }
 
     private void addWithTopMargin(LinearLayout parent, View child, int topMarginDp) {
@@ -784,33 +990,17 @@ public class SettingsActivity extends Activity {
     }
 
     private void addSection(LinearLayout parent, String title, String subtitle, View card) {
-        TextView titleView = Ui.text(this, title, 13, palette.textMuted, true);
-        titleView.setLetterSpacing(0.04f);
-        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        titleParams.topMargin = dp(24);
-        titleParams.bottomMargin = dp(8);
-        parent.addView(titleView, titleParams);
-
+        parent.addView(M3.sectionLabel(this, palette, title));
         if (subtitle != null && !subtitle.isEmpty()) {
-            TextView sub = Ui.text(this, subtitle, 12, palette.textMuted, false);
-            LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            subParams.bottomMargin = dp(8);
-            parent.addView(sub, subParams);
+            TextView sub = Ui.text(this, subtitle, 11.5f, palette.textMuted, false);
+            sub.setPadding(dp(4), 0, dp(4), dp(6));
+            parent.addView(sub);
         }
         parent.addView(card);
     }
 
     private TextView makeChip(String label, boolean selected, Runnable action) {
-        TextView chip = Ui.text(this, label, 14, selected ? palette.onAccent : palette.text, true);
-        chip.setGravity(Gravity.CENTER);
-        chip.setPadding(0, dp(11), 0, dp(11));
-        chip.setBackground(Ui.ripple(this, selected ? palette.accent : palette.keySpecial,
-                12, selected ? 0x40FFFFFF : palette.keyStroke));
-        chip.setClickable(true);
-        chip.setOnClickListener(v -> action.run());
-        return chip;
+        return M3.chip(this, palette, label, selected, action);
     }
 
     private void updateLanguageChips() {
@@ -820,9 +1010,7 @@ public class SettingsActivity extends Activity {
     }
 
     private void styleChip(TextView chip, boolean selected) {
-        chip.setTextColor(selected ? palette.onAccent : palette.text);
-        chip.setBackground(Ui.ripple(this, selected ? palette.accent : palette.keySpecial,
-                12, selected ? 0x40FFFFFF : palette.keyStroke));
+        M3.applyChip(chip, this, palette, selected);
     }
 
     private void rebuildThemeChips() {
@@ -843,38 +1031,59 @@ public class SettingsActivity extends Activity {
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT);
                 if (i > 0) {
-                    rowParams.topMargin = dp(8);
+                    rowParams.topMargin = dp(9);
                 }
                 themeChips.addView(row, rowParams);
             }
             final int value = values[i];
             Palette themePalette = Palette.preview(value, systemDark, prefs.accent());
             boolean selected = prefs.theme() == value;
-            TextView chip = Ui.text(this, getString(labels[i]), 12, themePalette.text, true);
-            chip.setGravity(Gravity.CENTER);
-            chip.setPadding(dp(4), dp(13), dp(4), dp(13));
-            GradientDrawable chipBg = new GradientDrawable(
-                    GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{themePalette.bgTop, themePalette.bgBottom});
-            chipBg.setCornerRadius(dp(12));
-            chipBg.setStroke(dp(selected ? 2 : 1),
+
+            LinearLayout chip = Ui.horizontal(this);
+            chip.setPadding(dp(9), dp(12), dp(9), dp(12));
+            GradientDrawable bg = M3.gradient(this, themePalette.bgTop,
+                    themePalette.bgBottom, 14,
                     selected ? palette.accent : themePalette.keyStroke);
-            chip.setBackground(chipBg);
+            if (selected) {
+                bg.setStroke(dp(2), palette.accent);
+            }
+            chip.setBackground(new android.graphics.drawable.RippleDrawable(
+                    android.content.res.ColorStateList.valueOf(0x22FFFFFF), bg,
+                    Ui.rounded(this, 0xFFFFFFFF, 14)));
+            chip.setElevation(dp(selected ? 2 : 0));
+
+            View dot = new View(this);
+            GradientDrawable dotBg = new GradientDrawable();
+            dotBg.setShape(GradientDrawable.OVAL);
+            dotBg.setColor(themePalette.accent);
+            dot.setBackground(dotBg);
+            LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(dp(9), dp(9));
+            dotParams.rightMargin = dp(7);
+            chip.addView(dot, dotParams);
+
+            TextView name = Ui.text(this, getString(labels[i]), 10.5f,
+                    themePalette.text, true);
+            name.setSingleLine(true);
+            name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            chip.addView(name, new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
             chip.setClickable(true);
+            chip.setFocusable(true);
             chip.setOnClickListener(v -> {
                 prefs.setTheme(value);
-                recreate();
+                recreateAt(SCREEN_APPEARANCE);
             });
+            M3.pressScale(chip);
+
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
             if (i % 3 != 0) {
-                params.leftMargin = dp(8);
+                params.leftMargin = dp(9);
             }
             row.addView(chip, params);
         }
     }
-
-    // ----------------------------------------------------------- voice typing
 
     private LinearLayout buildVoiceCard() {
         LinearLayout card = Ui.card(this, palette);
@@ -1449,19 +1658,9 @@ public class SettingsActivity extends Activity {
 
     private void addSwitchRow(LinearLayout card, int titleRes, int descriptionRes,
                               String key, boolean value) {
-        LinearLayout row = Ui.settingRow(this, palette, getString(titleRes), getString(descriptionRes));
-        row.setClickable(true);
-        row.setFocusable(true);
-        row.setBackground(Ui.ripple(this, Color.TRANSPARENT, 12, palette.keyStroke));
-
-        Switch toggle = new Switch(this);
-        toggle.setChecked(value);
-        toggle.setShowText(false);
-        toggle.setPadding(dp(8), 0, 0, 0);
-        toggle.setOnCheckedChangeListener((buttonView, checked) -> prefs.setBoolean(key, checked));
-        row.addView(toggle);
-        row.setOnClickListener(v -> toggle.toggle());
-        card.addView(row);
+        card.addView(M3.switchRow(this, palette, getString(titleRes),
+                getString(descriptionRes), value,
+                checked -> prefs.setBoolean(key, checked)));
     }
 
     private void showGuide() {
@@ -1522,7 +1721,7 @@ public class SettingsActivity extends Activity {
                 selected ? palette.success : enabled ? palette.accent : palette.textMuted, 5));
         enableButton.setText(enabled ? R.string.action_settings : R.string.action_enable);
         chooseButton.setText(selected ? R.string.action_change : R.string.action_choose);
-        chooseButton.setBackground(Ui.ripple(this, palette.accent, 12, 0x40FFFFFF));
+        chooseButton.setBackground(Ui.ripple(this, palette.accent, 22, 0x33FFFFFF));
         chooseButton.setTextColor(palette.onAccent);
 
         if (chipEnglish != null) {
