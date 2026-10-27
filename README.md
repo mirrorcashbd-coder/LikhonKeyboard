@@ -286,7 +286,47 @@ preview and repeat-delete cheap. Touch handling keeps one small state object per
 finger (key, long-press timer, delete-repeat timer), which is what allows
 simultaneous presses.
 
+## Voice typing
+
+Voice has three modes, chosen in Settings → Voice → **Voice method**:
+
+- **Automatic** (default). The keyboard asks the phone's own recogniser first,
+  inside the keyboard, and only falls back to the phone's speech screen when the
+  phone stays silent for seven seconds or the recogniser refuses the keyboard.
+- **Inside the keyboard only.** Nothing else ever opens; on a phone whose
+  recognisers ignore third-party callers this mode simply stays silent.
+- **Google voice screen.** Always use the phone's speech screen (the one Gboard
+  opens). It recognises reliably, but Android hides the keyboard while a speech
+  activity is in front; the keyboard returns with the text as soon as it closes.
+
+The fallback matters on phones like the vivo that prompted it: their
+`CopilotRecognitionService` answers `CLIENT` (refuses) and the Google app's
+`GoogleRecognitionService` answers `TOO_MANY_REQUESTS` to anything but its own
+screen. The screen talks to Google inside the Google app, so it works; the
+keyboard cannot keep itself visible under an activity started by another app —
+that is the platform's rule, not a choice here.
+
+## Toolbar icons
+
+The toolbar uses Material Design line icons as vector drawables
+(`res/drawable/ic_undo.xml` and friends, Apache 2.0) instead of emoji, tinted
+with the current theme. Every tap plays a short squash-and-settle animation and
+undo/redo pivot to show the way the history moved.
+
 ## Changes
+
+**1.11**
+
+- Voice typing got the phone's own speech screen back as a fallback, because
+  several phones refuse inline recognition to every app but their own. Default
+  is automatic: inline first, then the Google voice screen if the phone stays
+  silent. Settings → Voice → Voice method switches between automatic, inline
+  only and screen only.
+- The keyboard toolbar now uses Material vector icons (undo, redo, clipboard,
+  copy, paste, translate, settings) with a tap animation, instead of emoji, and
+  a hairline separates it from the suggestions.
+- The speech-screen hand-off is a one-shot bridge, so text can never be inserted
+  twice.
 
 **1.10**
 

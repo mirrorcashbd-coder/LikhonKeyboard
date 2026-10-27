@@ -69,6 +69,7 @@ public class SettingsActivity extends Activity {
     private LinearLayout themeChips;
     private LinearLayout voiceLangChips;
     private LinearLayout voiceEngineChips;
+    private LinearLayout voiceModeChips;
     private TextView micStatus;
     private TextView micButton;
     private TextView micTestResult;
@@ -447,6 +448,18 @@ public class SettingsActivity extends Activity {
         card.addView(voiceLangChips);
         rebuildVoiceLangChips();
 
+        TextView methodLabel = Ui.text(this, getString(R.string.voice_method), 13,
+                palette.text, true);
+        methodLabel.setPadding(0, dp(20), 0, dp(8));
+        card.addView(methodLabel);
+        voiceModeChips = Ui.vertical(this);
+        card.addView(voiceModeChips);
+        rebuildVoiceModeChips();
+        TextView methodNote = Ui.text(this, getString(R.string.voice_method_note), 12,
+                palette.textMuted, false);
+        methodNote.setPadding(0, dp(6), 0, 0);
+        card.addView(methodNote);
+
         TextView engineLabel = Ui.text(this, getString(R.string.voice_engine), 13,
                 palette.text, true);
         engineLabel.setPadding(0, dp(20), 0, dp(8));
@@ -522,6 +535,30 @@ public class SettingsActivity extends Activity {
         note.setPadding(0, dp(12), 0, 0);
         card.addView(note);
         return card;
+    }
+
+    private void rebuildVoiceModeChips() {
+        if (voiceModeChips == null) {
+            return;
+        }
+        voiceModeChips.removeAllViews();
+        String selected = prefs.voiceMode();
+        String[][] options = {
+                {Prefs.VOICE_MODE_AUTO, getString(R.string.voice_mode_auto)},
+                {Prefs.VOICE_MODE_INLINE, getString(R.string.voice_mode_inline)},
+                {Prefs.VOICE_MODE_SCREEN, getString(R.string.voice_mode_screen)},
+        };
+        for (String[] option : options) {
+            TextView chip = makeChip(option[1], selected.equals(option[0]), () -> {
+                prefs.setVoiceMode(option[0]);
+                rebuildVoiceModeChips();
+            });
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            params.topMargin = dp(6);
+            voiceModeChips.addView(chip, params);
+        }
     }
 
     private void rebuildVoiceLangChips() {

@@ -38,6 +38,13 @@
             </intent-filter>
         </activity>
 
+        <!-- Invisible hop to the phone's speech screen; see VoiceScreenActivity. -->
+        <activity
+            android:name=".VoiceScreenActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <service
             android:name=".LikhonIme"
             android:exported="true"

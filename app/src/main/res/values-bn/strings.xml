@@ -45,7 +45,7 @@
 
     <string name="section_about">সম্পর্কে</string>
     <string name="about_body">লিখন একটি ছোট, অফলাইন কীবোর্ড। এতে বিজ্ঞাপন নেই এবং কোথাও কিছু পাঠায় না; মাইক্রোফোন কেবল ভয়েস টাইপিংয়ে ব্যবহার হয়। ইংরেজি সাধারণ QWERTY লেআউট; বাংলা ফোনেটিক, অর্থাৎ ইংরেজি অক্ষরে যেভাবে উচ্চারণ হয় সেভাবে লিখলেই বাংলা হয়।</string>
-    <string name="about_version">সংস্করণ ১.১০</string>
+    <string name="about_version">সংস্করণ ১.১১</string>
     <string name="footer">অফলাইন · বিজ্ঞাপন নেই · মাইক অনুমতি ঐচ্ছিক</string>
     <string name="about_guide">বাংলা টাইপিং নির্দেশিকা</string>
 
@@ -163,4 +163,12 @@
     <string name="opt_double_space">ডাবল স্পেসে দাঁড়ি</string>
     <string name="opt_double_space_desc">স্পেসে দুইবার চাপলে দাঁড়ি বসে।</string>
     <string name="reset_height">উচ্চতা রিসেট</string>
+    <string name="voice_method">ভয়েস পদ্ধতি</string>
+    <string name="voice_method_note">কিছু ফোনের রিকগনাইজার শুধু ফোনের নিজের ভয়েস স্ক্রিনকেই কাজ করতে দেয়। “স্বয়ংক্রিয়” আগে কীবোর্ডের ভিতরেই চেষ্টা করে, কিছু না শুনলে ফোনের ভয়েস স্ক্রিন খোলে — ওটা খোলা থাকলে কীবোর্ড লুকায় (এটা ফোনের নিয়ম), কাজ শেষে লেখাসহ ফিরে আসে।</string>
+    <string name="voice_mode_auto">স্বয়ংক্রিয় (আগে কীবোর্ডে, দরকারে Google)</string>
+    <string name="voice_mode_inline">শুধু কীবোর্ডের ভিতরে</string>
+    <string name="voice_mode_screen">Google ভয়েস স্ক্রিন</string>
+    <string name="voice_screen_prompt">এখন বলুন</string>
+    <string name="voice_screen_missing">এই ফোনে ভয়েস স্ক্রিন নেই।</string>
+    <string name="voice_screen_opening">Google ভয়েস খুলছে…</string>
 </resources>

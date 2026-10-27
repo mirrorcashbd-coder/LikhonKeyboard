@@ -23,7 +23,10 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.ExtractedText;
 import android.view.inputmethod.ExtractedTextRequest;
 import android.view.inputmethod.InputConnection;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -80,8 +83,9 @@ public class LikhonIme extends InputMethodService
     // Editing tools: the toolbar above the suggestions, the clipboard history
     // and the undo stack. All of it is local to this keyboard.
     private LinearLayout toolBar;
-    private TextView undoView;
-    private TextView redoView;
+    private View toolDivider;
+    private ImageView undoView;
+    private ImageView redoView;
     private LinearLayout panelHost;
     private LinearLayout clipPanel;
     private LinearLayout clipList;
@@ -100,6 +104,22 @@ public class LikhonIme extends InputMethodService
     private boolean translateFromSelection;
     private long clearArmedAt;
     private long lastSpaceAt;
+
+    // Voice: a handler for the screen hand-off and the "inline stayed silent"
+    // timer.
+    private Handler uiHandler;
+    private boolean voiceGotText;
+    private final Runnable voiceScreenFallback = new Runnable() {
+        @Override
+        public void run() {
+            if (!voiceListening || voiceGotText) {
+                return;
+            }
+            VoiceLog.add("inline silent, opening voice screen");
+            stopVoice(true);
+            openVoiceScreen();
+        }
+    };
 
     private static final int MAX_SUGGESTIONS = 18;
 
@@ -126,10 +146,16 @@ public class LikhonIme extends InputMethodService
         bangla = prefs.bangla();
         palette = Palette.resolve(this, prefs.theme());
         prefs.register(this);
+        uiHandler = new Handler(Looper.getMainLooper());
+        VoiceScreenBridge.listen(() -> uiHandler.postDelayed(this::flushVoiceScreenText, 400));
     }
 
     @Override
     public void onDestroy() {
+        VoiceScreenBridge.listen(null);
+        if (uiHandler != null) {
+            uiHandler.removeCallbacksAndMessages(null);
+        }
         if (voice != null) {
             voice.destroy();
             voice = null;
@@ -155,7 +181,11 @@ public class LikhonIme extends InputMethodService
         undoStack = new UndoStack();
         toolBar = buildToolBar();
         root.addView(toolBar, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(36)));
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(40)));
+        toolDivider = new View(this);
+        toolDivider.setBackgroundColor(palette.divider);
+        root.addView(toolDivider, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, Math.max(1, dp(0.6f))));
         candidateScroll = buildCandidateBar();
         root.addView(candidateScroll, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -355,8 +385,19 @@ public class LikhonIme extends InputMethodService
     }
 
     @Override
+    public void onWindowShown() {
+        super.onWindowShown();
+        if (uiHandler != null) {
+            uiHandler.postDelayed(this::flushVoiceScreenText, 320);
+        }
+    }
+
+    @Override
     public void onStartInputView(EditorInfo info, boolean restarting) {
         super.onStartInputView(info, restarting);
+        if (uiHandler != null) {
+            uiHandler.postDelayed(this::flushVoiceScreenText, 320);
+        }
         if (undoStack != null) {
             undoStack.reset();
             refreshToolbar();
@@ -504,6 +545,9 @@ public class LikhonIme extends InputMethodService
         if (toolBar != null) {
             toolBar.setBackgroundColor(palette.bg);
             styleToolBar();
+        }
+        if (toolDivider != null) {
+            toolDivider.setBackgroundColor(palette.divider);
         }
         if (panelHost != null) {
             panelHost.setBackgroundColor(palette.surfaceAlt);
@@ -852,31 +896,73 @@ public class LikhonIme extends InputMethodService
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setPadding(dp(3), 0, dp(3), 0);
         bar.setBackgroundColor(palette.bg);
-        undoView = toolButton(bar, "↩", R.string.action_undo, this::performUndo);
-        redoView = toolButton(bar, "↪", R.string.action_redo, this::performRedo);
-        toolButton(bar, "📋", R.string.action_clipboard, this::toggleClipPanel);
-        toolButton(bar, "📄", R.string.action_copy, this::copyToClipboard);
-        toolButton(bar, "⬇", R.string.action_paste, this::pasteFromClipboard);
-        toolButton(bar, "🌐", R.string.action_translate, this::toggleTranslatePanel);
-        toolButton(bar, "⚙", R.string.action_settings, this::openSettings);
+        undoView = toolButton(bar, R.drawable.ic_undo, R.string.action_undo, this::performUndo);
+        redoView = toolButton(bar, R.drawable.ic_redo, R.string.action_redo, this::performRedo);
+        toolButton(bar, R.drawable.ic_clipboard, R.string.action_clipboard, this::toggleClipPanel);
+        toolButton(bar, R.drawable.ic_copy, R.string.action_copy, this::copyToClipboard);
+        toolButton(bar, R.drawable.ic_paste, R.string.action_paste, this::pasteFromClipboard);
+        toolButton(bar, R.drawable.ic_translate, R.string.action_translate, this::toggleTranslatePanel);
+        toolButton(bar, R.drawable.ic_settings, R.string.action_settings, this::openSettings);
         refreshToolbar();
         return bar;
     }
 
-    private TextView toolButton(LinearLayout bar, String label, int description, Runnable action) {
-        TextView view = new TextView(this);
-        view.setText(label);
-        view.setTextSize(16f);
-        view.setGravity(Gravity.CENTER);
-        view.setTextColor(palette.text);
+    /**
+     * One Material icon in the toolbar. A short press animation makes the tap
+     * feel answered without any extra drawable or library.
+     */
+    private ImageView toolButton(LinearLayout bar, int iconRes, int description,
+                                 Runnable action) {
+        ImageView view = new ImageView(this);
+        view.setImageResource(iconRes);
+        view.setColorFilter(palette.text);
         view.setContentDescription(getString(description));
-        view.setBackground(Ui.ripple(this, palette.bg, 8, palette.keyStroke));
+        view.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        view.setBackground(Ui.ripple(this, palette.bg, 10, palette.keyStroke));
         view.setClickable(true);
         view.setFocusable(true);
-        view.setOnClickListener(v -> action.run());
+        int pad = dp(7);
+        view.setPadding(pad, pad, pad, pad);
+        view.setOnClickListener(v -> {
+            pulse(v);
+            action.run();
+        });
         bar.addView(view, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.MATCH_PARENT, 1f));
         return view;
+    }
+
+    /** A short pivot that shows which way the history just moved. */
+    private static void spin(View view, float degrees) {
+        if (view == null) {
+            return;
+        }
+        view.setRotation(0f);
+        view.animate()
+                .rotation(degrees)
+                .setDuration(110)
+                .setInterpolator(new DecelerateInterpolator())
+                .withEndAction(() -> view.animate()
+                        .rotation(0f)
+                        .setDuration(160)
+                        .setInterpolator(new OvershootInterpolator(1.6f))
+                        .start())
+                .start();
+    }
+
+    /** Quick squash-and-settle, the animation every modern toolbar has. */
+    private static void pulse(View view) {
+        view.animate().cancel();
+        view.animate()
+                .scaleX(0.78f).scaleY(0.78f)
+                .setDuration(80)
+                .setInterpolator(new DecelerateInterpolator())
+                .withEndAction(() -> view.animate()
+                        .scaleX(1f).scaleY(1f)
+                        .setDuration(190)
+                        .setInterpolator(new OvershootInterpolator(2.4f))
+                        .start())
+                .start();
     }
 
     private void styleToolBar() {
@@ -885,9 +971,9 @@ public class LikhonIme extends InputMethodService
         }
         for (int i = 0; i < toolBar.getChildCount(); i++) {
             View child = toolBar.getChildAt(i);
-            if (child instanceof TextView) {
-                ((TextView) child).setTextColor(palette.text);
-                child.setBackground(Ui.ripple(this, palette.bg, 8, palette.keyStroke));
+            if (child instanceof ImageView) {
+                ((ImageView) child).setColorFilter(palette.text);
+                child.setBackground(Ui.ripple(this, palette.bg, 10, palette.keyStroke));
             }
         }
         refreshToolbar();
@@ -943,6 +1029,7 @@ public class LikhonIme extends InputMethodService
     }
 
     private void performUndo() {
+        spin(undoView, -28f);
         InputConnection ic = getCurrentInputConnection();
         if (ic == null || undoStack == null) {
             return;
@@ -962,6 +1049,7 @@ public class LikhonIme extends InputMethodService
     }
 
     private void performRedo() {
+        spin(redoView, 28f);
         InputConnection ic = getCurrentInputConnection();
         if (ic == null || undoStack == null) {
             return;
@@ -1436,6 +1524,12 @@ public class LikhonIme extends InputMethodService
             stopVoice(false);
             return;
         }
+        String mode = prefs.voiceMode();
+        if (Prefs.VOICE_MODE_SCREEN.equals(mode)) {
+            VoiceLog.add("voice screen (always)");
+            openVoiceScreen();
+            return;
+        }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
             Toast.makeText(this, R.string.voice_permission_needed, Toast.LENGTH_LONG).show();
@@ -1447,6 +1541,10 @@ public class LikhonIme extends InputMethodService
         }
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
             VoiceLog.add("no recognition service");
+            if (Prefs.VOICE_MODE_AUTO.equals(mode)) {
+                openVoiceScreen();
+                return;
+            }
             Toast.makeText(this, R.string.voice_unavailable, Toast.LENGTH_LONG).show();
             return;
         }
@@ -1455,6 +1553,7 @@ public class LikhonIme extends InputMethodService
         resetVoiceLevel();
         voicePreviewing = false;
         voiceListening = true;
+        voiceGotText = false;
         voiceMisses = 0;
         voiceEngineErrors = 0;
         voiceHelpShown = false;
@@ -1468,6 +1567,44 @@ public class LikhonIme extends InputMethodService
             voice = new VoiceInput(this, this);
         }
         voice.start(voiceLanguage(), prefs.voiceContinuous());
+        if (Prefs.VOICE_MODE_AUTO.equals(mode) && uiHandler != null) {
+            // On phones whose recognisers ignore the keyboard, give the inline
+            // attempt a few seconds and then use the phone's own speech screen.
+            uiHandler.removeCallbacks(voiceScreenFallback);
+            uiHandler.postDelayed(voiceScreenFallback, 5000);
+        }
+    }
+
+    /** Opens the phone's speech screen (Google voice) and inserts its result. */
+    private void openVoiceScreen() {
+        Intent intent = new Intent(this, VoiceScreenActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        intent.putExtra(VoiceScreenActivity.EXTRA_LANGUAGE, voiceLanguage());
+        Toast.makeText(this, R.string.voice_screen_opening, Toast.LENGTH_SHORT).show();
+        startActivity(intent);
+    }
+
+    /** Puts text recognised by the speech screen into the editor, once. */
+    private void flushVoiceScreenText() {
+        String text = VoiceScreenBridge.takeText();
+        String language = VoiceScreenBridge.takeLanguage();
+        if (text == null) {
+            return;
+        }
+        if (language != null && !language.isEmpty()) {
+            voiceLangOverride = language;
+        }
+        String converted = voiceText(text);
+        voiceLangOverride = null;
+        if (converted.isEmpty()) {
+            return;
+        }
+        recordUndo(false);
+        commit(converted + " ");
+        VoiceLog.add("screen insert: " + converted);
+        learnSentence(converted);
+        lastSuggestionKey = "";
+        updateSuggestions();
     }
 
     private void resetVoiceLevel() {
@@ -1479,6 +1616,9 @@ public class LikhonIme extends InputMethodService
 
     /** Asks the recogniser to finish what it heard and closes the strip. */
     private void stopVoice(boolean cancel) {
+        if (uiHandler != null) {
+            uiHandler.removeCallbacks(voiceScreenFallback);
+        }
         if (voice != null) {
             if (cancel) {
                 voice.cancel();
@@ -1618,6 +1758,9 @@ public class LikhonIme extends InputMethodService
         if (ic != null) {
             ic.setComposingText(text, 1);
             voicePreviewing = true;
+            if (text != null && !text.trim().isEmpty()) {
+                voiceGotText = true;
+            }
         }
     }
 
@@ -1718,6 +1861,7 @@ public class LikhonIme extends InputMethodService
             return;
         }
         voicePreviewing = false;
+        voiceGotText = true;
         recordUndo(false);
         commit(converted + " ");
         VoiceLog.add("insert: " + converted);
@@ -1851,6 +1995,19 @@ public class LikhonIme extends InputMethodService
             voicePanel.setVisibility(View.VISIBLE);
         }
         VoiceLog.add("stopped: " + VoiceInput.errorName(code));
+        if (Prefs.VOICE_MODE_AUTO.equals(prefs.voiceMode()) && !voiceGotText) {
+            // The phone's recogniser gave up on the keyboard: use its own
+            // speech screen rather than leaving the user with no voice at all.
+            VoiceLog.add("inline failed, opening voice screen");
+            if (uiHandler != null) {
+                uiHandler.removeCallbacks(voiceScreenFallback);
+            }
+            if (voicePanel != null) {
+                voicePanel.setVisibility(View.GONE);
+            }
+            openVoiceScreen();
+            return;
+        }
         String message = voiceErrorMessage(code) + " (" + VoiceInput.errorName(code) + ")";
         if (voiceStatus != null) {
             voiceStatus.setText(message);
@@ -1867,6 +2024,11 @@ public class LikhonIme extends InputMethodService
         }
         if (voicePanel != null) {
             voicePanel.setVisibility(View.GONE);
+        }
+        if (Prefs.VOICE_MODE_AUTO.equals(prefs.voiceMode())) {
+            VoiceLog.add("unavailable inline, opening voice screen");
+            openVoiceScreen();
+            return;
         }
         Toast.makeText(this, R.string.voice_unavailable, Toast.LENGTH_LONG).show();
     }

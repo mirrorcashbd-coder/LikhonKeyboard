@@ -20,6 +20,7 @@ final class Prefs {
     static final String KEY_VOICE_CONTINUOUS = "voice_continuous";
     static final String KEY_VOICE_CLEANUP = "voice_cleanup";
     static final String KEY_VOICE_ENGINE = "voice_engine";
+    static final String KEY_VOICE_MODE = "voice_mode";
     static final String KEY_HEIGHT = "keyboard_height";
     static final String KEY_POPUP = "key_popup";
     static final String KEY_NUMBER_ROW = "number_row";
@@ -27,6 +28,13 @@ final class Prefs {
 
     /** Voice language follows the typing language. */
     static final String VOICE_AUTO = "auto";
+
+    /** Voice inside the keyboard, then the phone's speech screen if it stays silent. */
+    static final String VOICE_MODE_AUTO = "auto";
+    /** Only ever use the recogniser inside the keyboard. */
+    static final String VOICE_MODE_INLINE = "inline";
+    /** Always use the phone's speech screen (Google voice). */
+    static final String VOICE_MODE_SCREEN = "screen";
 
     static final int THEME_SYSTEM = 0;
     static final int THEME_LIGHT = 1;
@@ -101,6 +109,14 @@ final class Prefs {
 
     void setVoiceEngine(String value) {
         sp.edit().putString(KEY_VOICE_ENGINE, value == null ? "" : value).apply();
+    }
+
+    String voiceMode() {
+        return sp.getString(KEY_VOICE_MODE, VOICE_MODE_AUTO);
+    }
+
+    void setVoiceMode(String value) {
+        sp.edit().putString(KEY_VOICE_MODE, value).apply();
     }
 
     boolean showPopup() {
