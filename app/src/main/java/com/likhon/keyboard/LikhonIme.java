@@ -1116,6 +1116,11 @@ public class LikhonIme extends InputMethodService
         if (voiceLangOverride != null || voice == null || voiceMisses < 2) {
             return false;
         }
+        // Silence is not proof that the model is wrong: only switch models
+        // once the recogniser actually heard something and still missed it.
+        if (!voice.hasHeardSpeech()) {
+            return false;
+        }
         if (!voiceIsBangla() || !Prefs.VOICE_AUTO.equals(prefs.voiceLang())) {
             return false;
         }
@@ -1137,7 +1142,8 @@ public class LikhonIme extends InputMethodService
         if (voiceOnDeviceTried || voice == null) {
             return false;
         }
-        if (voiceMisses < 4 && voiceEngineErrors < 2) {
+        boolean heard = voice != null && voice.hasHeardSpeech();
+        if (voiceEngineErrors < 2 && (!heard || voiceMisses < 4)) {
             return false;
         }
         if (!VoiceInput.onDeviceAvailable(this)) {

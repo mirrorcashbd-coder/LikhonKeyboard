@@ -6,6 +6,7 @@ import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -63,6 +64,7 @@ public class SettingsActivity extends Activity {
     private TextView chipBangla;
     private LinearLayout themeChips;
     private LinearLayout voiceLangChips;
+    private LinearLayout voiceEngineChips;
     private TextView micStatus;
     private TextView micButton;
     private TextView micTestResult;
@@ -373,6 +375,30 @@ public class SettingsActivity extends Activity {
         card.addView(voiceLangChips);
         rebuildVoiceLangChips();
 
+        TextView engineLabel = Ui.text(this, getString(R.string.voice_engine), 13,
+                palette.text, true);
+        engineLabel.setPadding(0, dp(20), 0, dp(8));
+        card.addView(engineLabel);
+        voiceEngineChips = Ui.vertical(this);
+        card.addView(voiceEngineChips);
+        rebuildVoiceEngineChips();
+        TextView engineNote = Ui.text(this, getString(R.string.voice_engine_note), 12,
+                palette.textMuted, false);
+        engineNote.setPadding(0, dp(6), 0, 0);
+        card.addView(engineNote);
+
+        if (!hasPackage("com.google.android.googlequicksearchbox")) {
+            LinearLayout googleRow = Ui.horizontal(this);
+            TextView googleNote = Ui.text(this, getString(R.string.voice_google_missing),
+                    12, palette.textMuted, false);
+            googleNote.setLayoutParams(new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            googleRow.addView(googleNote);
+            googleRow.addView(Ui.button(this, palette,
+                    getString(R.string.voice_google_install), false, this::openGoogleApp));
+            addWithTopMargin(card, googleRow, 10);
+        }
+
         addSwitchRow(card, R.string.opt_banglish, R.string.opt_banglish_desc,
                 Prefs.KEY_VOICE_BANGLISH, prefs.voiceBanglish());
         addSwitchRow(card, R.string.opt_voice_continuous, R.string.opt_voice_continuous_desc,
@@ -461,6 +487,77 @@ public class SettingsActivity extends Activity {
                 params.leftMargin = dp(8);
             }
             row.addView(chip, params);
+        }
+    }
+
+    /**
+     * The recognisers installed on the phone. Pinning one is the manual way
+     * out of a device whose default service refuses the keyboard.
+     */
+    private void rebuildVoiceEngineChips() {
+        if (voiceEngineChips == null) {
+            return;
+        }
+        voiceEngineChips.removeAllViews();
+        String selected = prefs.voiceEngine();
+        List<String[]> options = new ArrayList<>();
+        options.add(new String[]{"", getString(R.string.voice_engine_auto)});
+        for (ComponentName name : VoiceInput.availableEngines(this)) {
+            options.add(new String[]{name.flattenToString(), engineName(name)});
+        }
+        for (String[] option : options) {
+            TextView chip = makeChip(option[1], selected.equals(option[0]), () -> {
+                prefs.setVoiceEngine(option[0]);
+                rebuildVoiceEngineChips();
+            });
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            params.topMargin = dp(6);
+            voiceEngineChips.addView(chip, params);
+        }
+    }
+
+    private boolean hasPackage(String pkg) {
+        try {
+            getPackageManager().getPackageInfo(pkg, 0);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void openGoogleApp() {
+        Intent market = new Intent(Intent.ACTION_VIEW,
+                android.net.Uri.parse("market://details?id=com.google.android.googlequicksearchbox"));
+        market.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            startActivity(market);
+        } catch (ActivityNotFoundException e) {
+            Intent web = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(
+                    "https://play.google.com/store/apps/details?id=com.google.android.googlequicksearchbox"));
+            web.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            try {
+                startActivity(web);
+            } catch (ActivityNotFoundException ignored) {
+                Toast.makeText(this, R.string.voice_unavailable, Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    private String engineName(ComponentName name) {
+        try {
+            PackageManager pm = getPackageManager();
+            CharSequence app = pm.getApplicationLabel(
+                    pm.getApplicationInfo(name.getPackageName(), 0));
+            String service = name.getClassName();
+            int dot = service.lastIndexOf('.');
+            if (dot >= 0 && dot + 1 < service.length()) {
+                service = service.substring(dot + 1);
+            }
+            return app + " · " + service;
+        } catch (Exception e) {
+            return name.flattenToShortString();
         }
     }
 

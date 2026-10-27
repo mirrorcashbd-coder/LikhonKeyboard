@@ -6,14 +6,14 @@ no AndroidX, no third-party libraries, no ads, and nothing of its own ever goes
 online (the `INTERNET` permission is declared only for speech services that run
 inside the calling app).
 
-**APK:** `build/manual/LikhonKeyboard-1.8.apk` (also copied to
-`/sdcard/Download/LikhonKeyboard-1.8.apk`)
+**APK:** `build/manual/LikhonKeyboard-1.9.apk` (also copied to
+`/sdcard/Download/LikhonKeyboard-1.9.apk`)
 
 ---
 
 ## Install
 
-1. Open `LikhonKeyboard-1.8.apk` in the Files app and allow "install unknown apps"
+1. Open `LikhonKeyboard-1.9.apk` in the Files app and allow "install unknown apps"
    for that app if asked.
 2. Open **Likhon Keyboard** from the app drawer.
 3. Tap **Enable keyboard** → turn on "Likhon Keyboard".
@@ -67,11 +67,19 @@ microphone, language chip, level bar and **Stop**. Words appear as you speak,
 like Gboard's Rambler. There is deliberately no separate speech screen: every
 step happens inside the keyboard.
 
-When the phone's speech service keeps hearing nothing, the strip tries the other
-Bangla model (bn-IN) and then Android's on-device recogniser, saying which one
-it is using. Every voice event (start, ready, speech started, error name,
-result, insert) is written to an in-memory **voice log** at the bottom of the
-voice settings, with a copy button, because there is no logcat on the phone.
+The keyboard never abandons a working microphone because of silence. The other
+Bangla model (bn-IN) is only tried after the recogniser has actually caught
+speech and still missed it, and Android's on-device recogniser only after real
+failures. If a service refuses with CLIENT/BUSY the next engine on the phone is
+tried, and an engine that never reports a voice or even a sound level (a stub
+some phones ship as the default) is skipped after a few silent attempts. Every
+voice event (start, ready, speech started, error name, result, insert, which
+engine) is written to an in-memory **voice log** at the bottom of the voice
+settings, with a copy button, because there is no logcat on the phone.
+
+Settings → Voice also lists **every recognition engine on the phone** and lets
+one be pinned instead of the default, and it says so (with an install button)
+when the Google app is missing — the recogniser Gboard itself uses.
 
 Settings also has a **Microphone check** (records 1.5 s and reports the level)
 and a **Speech service check** (runs one recognition and prints the result or
@@ -205,7 +213,7 @@ equivalent ARM64 build script is included. It uses the Ubuntu/Debian
 tools/build-apk-arm64.sh
 ```
 
-Output: `build/manual/LikhonKeyboard-1.8.apk` (signed with the debug key in
+Output: `build/manual/LikhonKeyboard-1.9.apk` (signed with the debug key in
 `keystore/likhon-debug.jks`, generated on first run — keep that file if you want
 future builds to install over the current one).
 
@@ -254,6 +262,25 @@ finger (key, long-press timer, delete-repeat timer), which is what allows
 simultaneous presses.
 
 ## Changes
+
+**1.9**
+
+- Voice no longer gives up on a good engine because nobody spoke yet: the
+  bn-IN fallback and the on-device switch now require the recogniser to have
+  actually heard speech, so a quiet first few seconds can no longer throw a
+  working Bangla session away.
+- An engine that answers with CLIENT/BUSY on a Bangla tag gets one retry with
+  the other Bangla tag (bn-BD ↔ bn-IN) before the next engine is used, because
+  several phone services report "language not supported" as CLIENT.
+- Engine order is the phone's default first, then the Google app's recogniser
+  (added by component even when package visibility hides it), then the rest.
+  The old build could switch to a stub and stay there for ever; an engine that
+  never reports a voice or a sound level is now left after three silent turns.
+- Settings → Voice has a **Recognition engine** chooser (Automatic, or one of
+  the services actually installed) and warns with an install button when the
+  Google app is missing.
+- If no engine answers at all, the strip now stops and shows the error instead
+  of restarting the microphone for ever.
 
 **1.8**
 
@@ -357,8 +384,13 @@ simultaneous presses.
   is installed, and Bangla needs a Bangla language pack. It cannot use Gboard's
   private Rambler implementation directly.
 - Speech recognition still depends on the phone's service accepting an input
-  method as its caller. If it does not, the strip says so and the voice log
-  shows the error name; there is no second screen to fall back to by design.
+  method as its caller. If no installed engine accepts it, the strip says so and
+  the voice log shows the error name; there is no second screen to fall back to
+  by design.
+- Some phones (vivo/Funtouch, for example) ship only their own assistant as a
+  recognition service and answer CLIENT to other apps. The Google app provides
+  the recogniser Gboard uses; with it installed the keyboard picks it up
+  automatically, without it the phone's engine decides.
 - Voice punctuation only recognises the listed words, and `period`/`colon`
   count as punctuation only at the end of a phrase (they are common nouns).
 - The custom keyboard view is not fully accessible to TalkBack; keys are not

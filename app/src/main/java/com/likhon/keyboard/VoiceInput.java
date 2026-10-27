@@ -62,10 +62,21 @@ final class VoiceInput implements RecognitionListener {
     private SpeechRecognizer recognizer;
     private int startFailures;
     private boolean onDevice;
-    /** Engine candidates: null first (the phone's default), then every service found. */
+    /**
+     * Recognisers to try, in order. A null entry means "whatever the phone
+     * picked as its default", which is tried first unless one is pinned in
+     * settings.
+     */
     private final List<ComponentName> engines = new ArrayList<>();
     private int engineIndex;
+    private int cycles;
     private int consecutiveFailures;
+    private boolean heardSpeech;
+    private boolean alternateLanguageTried;
+    /** Per-engine signals: did this engine hear a voice or receive any audio? */
+    private boolean engineHeard;
+    private boolean engineAudio;
+    private int engineMisses;
     private boolean wantListening;
     private boolean continuous;
     private String language = "bn-BD";
@@ -97,6 +108,11 @@ final class VoiceInput implements RecognitionListener {
         return onDevice;
     }
 
+    /** True once the current session actually heard a voice. */
+    boolean hasHeardSpeech() {
+        return heardSpeech;
+    }
+
     /**
      * Switches the running session to Android's on-device recogniser. Used as a
      * last resort when the phone's normal speech service never answers.
@@ -112,15 +128,14 @@ final class VoiceInput implements RecognitionListener {
         begin();
     }
 
+    /**
+     * Whether it is worth asking for Android's on-device recogniser. The
+     * system's own check is optimistic on some phones (it says no while a
+     * service is there), so on Android 12+ it is simply tried: if the phone
+     * has none, creating it throws and the next engine is used.
+     */
     static boolean onDeviceAvailable(Context context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-            return false;
-        }
-        try {
-            return SpeechRecognizer.isOnDeviceRecognitionAvailable(context);
-        } catch (RuntimeException e) {
-            return false;
-        }
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
     }
 
     /**
@@ -132,7 +147,13 @@ final class VoiceInput implements RecognitionListener {
         this.continuous = continuous;
         this.onDevice = false;
         this.consecutiveFailures = 0;
+        this.cycles = 0;
         this.engineIndex = 0;
+        this.heardSpeech = false;
+        this.alternateLanguageTried = false;
+        this.engineHeard = false;
+        this.engineAudio = false;
+        this.engineMisses = 0;
         buildEngines();
         this.wantListening = true;
         VoiceLog.add("start " + this.language + (continuous ? ", continuous" : ""));
@@ -157,8 +178,8 @@ final class VoiceInput implements RecognitionListener {
                             context.getApplicationContext());
                 } else {
                     onDevice = false;
-                    ComponentName engine = engineIndex > 0 && engineIndex <= engines.size()
-                            ? engines.get(engineIndex - 1) : null;
+                    ComponentName engine = engineIndex >= 0 && engineIndex < engines.size()
+                            ? engines.get(engineIndex) : null;
                     if (engine == null) {
                         recognizer = SpeechRecognizer.createSpeechRecognizer(
                                 context.getApplicationContext());
@@ -170,6 +191,12 @@ final class VoiceInput implements RecognitionListener {
                 recognizer.setRecognitionListener(this);
             } catch (RuntimeException e) {
                 recognizer = null;
+                onDevice = false;
+                VoiceLog.add("engine create failed: " + e);
+                if (nextEngine()) {
+                    handler.postDelayed(restart, RESTART_DELAY_MS);
+                    return;
+                }
                 wantListening = false;
                 listener.onVoiceUnavailable();
                 return;
@@ -199,47 +226,94 @@ final class VoiceInput implements RecognitionListener {
     }
 
     /**
-     * Lists the recognisers actually installed. Some phones ship a stub as the
-     * default service while a working one (usually Google's) sits next to it;
-     * with this list the wrapper can move on instead of retrying a dead engine.
+     * Lists the recognisers installed on the phone, the phone's own default
+     * first and a pinned engine (settings) before everything else.
      */
     private void buildEngines() {
         engines.clear();
-        try {
-            String defaultName = android.provider.Settings.Secure.getString(
-                    context.getContentResolver(), "voice_recognition_service");
-            VoiceLog.add("default engine: " + (defaultName == null ? "(none)" : defaultName));
-            List<ResolveInfo> found = context.getPackageManager().queryIntentServices(
-                    new Intent(android.speech.RecognitionService.SERVICE_INTERFACE), 0);
-            if (found != null) {
-                for (ResolveInfo info : found) {
-                    if (info.serviceInfo == null) {
-                        continue;
-                    }
-                    ComponentName name = new ComponentName(
-                            info.serviceInfo.packageName, info.serviceInfo.name);
-                    boolean duplicate = name.flattenToString().equals(defaultName);
-                    if (!duplicate) {
-                        engines.add(name);
-                    }
-                    VoiceLog.add("engine found: " + name.flattenToShortString()
-                            + (info.serviceInfo.enabled ? "" : " (disabled)")
-                            + (duplicate ? " (default)" : ""));
-                }
+        String pinned = new Prefs(context).voiceEngine();
+        if (pinned != null && !pinned.isEmpty()) {
+            ComponentName chosen = ComponentName.unflattenFromString(pinned);
+            if (chosen != null) {
+                engines.add(chosen);
+                VoiceLog.add("engine pinned: " + chosen.flattenToShortString());
             }
-        } catch (RuntimeException e) {
-            VoiceLog.add("engine list failed: " + e);
+        }
+        if (engines.isEmpty()) {
+            // Null is the phone's current default recogniser.
+            engines.add(null);
+        }
+        String defaultName = android.provider.Settings.Secure.getString(
+                context.getContentResolver(), "voice_recognition_service");
+        VoiceLog.add("default engine: " + (defaultName == null ? "(none)" : defaultName));
+        // The Google app's recogniser is the one Gboard uses. It is added even
+        // when package visibility hides it from the query above; if the app is
+        // missing, creating the recogniser fails and the next engine is tried.
+        addIfInstalled("com.google.android.googlequicksearchbox",
+                "com.google.android.voicesearch.serviceapi.GoogleRecognitionService");
+        for (ComponentName name : availableEngines(context)) {
+            VoiceLog.add("engine found: " + name.flattenToShortString()
+                    + (name.flattenToString().equals(defaultName) ? " (default)" : ""));
+            if (!engines.contains(name)) {
+                engines.add(name);
+            }
         }
     }
 
-    /** Moves to the next recogniser; false when there is none left. */
+    private void addIfInstalled(String pkg, String cls) {
+        try {
+            context.getPackageManager().getPackageInfo(pkg, 0);
+        } catch (Exception e) {
+            return;
+        }
+        ComponentName name = new ComponentName(pkg, cls);
+        if (!engines.contains(name)) {
+            engines.add(name);
+            VoiceLog.add("engine added: " + name.flattenToShortString());
+        }
+    }
+
+    /** Every recognition service the phone exposes to this keyboard. */
+    static List<ComponentName> availableEngines(Context context) {
+        List<ComponentName> found = new ArrayList<>();
+        try {
+            List<ResolveInfo> list = context.getPackageManager().queryIntentServices(
+                    new Intent(android.speech.RecognitionService.SERVICE_INTERFACE), 0);
+            if (list != null) {
+                for (ResolveInfo info : list) {
+                    if (info.serviceInfo != null) {
+                        found.add(new ComponentName(
+                                info.serviceInfo.packageName, info.serviceInfo.name));
+                    }
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // A locked-down package manager simply means "no engines".
+        }
+        return found;
+    }
+
+    /**
+     * Moves to the next recogniser. The list is walked twice before giving up,
+     * so a service that was briefly busy gets a second chance but a phone with
+     * no working engine does not spin forever.
+     */
     private boolean nextEngine() {
-        int total = engines.size() + 1;
-        if (engineIndex + 1 >= total) {
+        if (engines.isEmpty()) {
             return false;
         }
-        engineIndex++;
-        ComponentName name = engineIndex >= 1 ? engines.get(engineIndex - 1) : null;
+        if (engineIndex + 1 < engines.size()) {
+            engineIndex++;
+        } else if (cycles < 1) {
+            cycles++;
+            engineIndex = 0;
+        } else {
+            return false;
+        }
+        engineHeard = false;
+        engineAudio = false;
+        engineMisses = 0;
+        ComponentName name = engines.get(engineIndex);
         VoiceLog.add("engine -> " + (name == null ? "default" : name.flattenToShortString()));
         return true;
     }
@@ -319,11 +393,17 @@ final class VoiceInput implements RecognitionListener {
 
     @Override
     public void onBeginningOfSpeech() {
+        heardSpeech = true;
+        engineHeard = true;
+        consecutiveFailures = 0;
         VoiceLog.add("speech started");
     }
 
     @Override
     public void onRmsChanged(float rmsdB) {
+        if (rmsdB > -1f) {
+            engineAudio = true;
+        }
         float level = (rmsdB + 2f) / 12f;
         if (level < 0f) {
             level = 0f;
@@ -361,6 +441,18 @@ final class VoiceInput implements RecognitionListener {
                 return;
             }
         }
+        // The engine does not know this language: try the other Bangla tag on
+        // the same engine before blaming the engine itself.
+        if ((error == 12 || error == 13) && language.startsWith("bn")
+                && !alternateLanguageTried) {
+            alternateLanguageTried = true;
+            language = "bn-BD".equals(language) ? "bn-IN" : "bn-BD";
+            VoiceLog.add("language -> " + language);
+            destroyRecognizer();
+            listener.onVoiceHint(error);
+            handler.postDelayed(restart, RESTART_DELAY_MS);
+            return;
+        }
         boolean recoverable = error == SpeechRecognizer.ERROR_NO_MATCH
                 || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
                 || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
@@ -373,14 +465,34 @@ final class VoiceInput implements RecognitionListener {
                 || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT
                 || error == SpeechRecognizer.ERROR_SERVER_DISCONNECTED
                 || error == SpeechRecognizer.ERROR_TOO_MANY_REQUESTS;
+        if (error == SpeechRecognizer.ERROR_NO_MATCH
+                || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+            engineMisses++;
+            // An engine that never reports a voice or even a sound level is
+            // not receiving audio at all (some phones bind a stub): move on.
+            if (engineMisses >= 3 && !engineHeard && !engineAudio && nextEngine()) {
+                destroyRecognizer();
+                listener.onVoiceHint(error);
+                handler.postDelayed(restart, RESTART_DELAY_MS);
+                return;
+            }
+        }
         if (recoverable) {
             if (engineProblem) {
                 consecutiveFailures++;
-                if (consecutiveFailures >= 2 && nextEngine()) {
+                if (consecutiveFailures >= 2) {
                     consecutiveFailures = 0;
                     destroyRecognizer();
-                    listener.onVoiceHint(error);
-                    handler.postDelayed(restart, RESTART_DELAY_MS);
+                    if (nextEngine()) {
+                        listener.onVoiceHint(error);
+                        handler.postDelayed(restart, RESTART_DELAY_MS);
+                        return;
+                    }
+                    // Every engine on the phone refused: say so instead of
+                    // retrying a dead microphone for ever.
+                    wantListening = false;
+                    VoiceLog.add("no engine answered, stopping");
+                    listener.onVoiceError(error);
                     return;
                 }
             }
