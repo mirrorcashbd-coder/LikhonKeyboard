@@ -45,7 +45,7 @@
 
     <string name="section_about">About</string>
     <string name="about_body">Likhon is a small, offline keyboard. It has no ads and never sends anything anywhere; the microphone is used only for voice typing. English is a standard QWERTY layout; Bangla is phonetic, so you type the sound in English letters.</string>
-    <string name="about_version">Version 2.0</string>
+    <string name="about_version">Version 2.1</string>
     <string name="footer">Offline · No ads · Optional microphone</string>
     <string name="about_guide">Bangla typing guide</string>
 
@@ -245,7 +245,7 @@
     <string name="theme_glacier">Glacier</string>
     <string name="theme_neon">Neon</string>
     <string name="theme_graphite">Graphite</string>
-    <string name="hero_version">v2.0</string>
+    <string name="hero_version">v2.1</string>
     <string name="key_gap">Key spacing</string>
     <string name="gap_compact">Compact</string>
     <string name="gap_normal">Normal</string>
@@ -289,4 +289,34 @@
     <string name="action_back">Back</string>
     <string name="dialog_cancel">Cancel</string>
     <string name="dialog_ok">OK</string>
+
+    <!-- Stickers -->
+    <string name="action_stickers">Stickers</string>
+    <string name="sticker_title">Stickers</string>
+    <string name="sticker_search_hint">Search stickers</string>
+    <string name="sticker_search_tip">Type to search</string>
+    <string name="sticker_clear">Clear search</string>
+    <string name="sticker_close">Close stickers</string>
+    <string name="sticker_recent">Recent</string>
+    <string name="sticker_favorites">Favourites</string>
+    <string name="sticker_no_result">No stickers found</string>
+    <string name="sticker_no_favorites">Long-press a sticker to keep it here</string>
+    <string name="sticker_no_recent">Stickers you send will appear here</string>
+    <string name="sticker_fav_on">Added to favourites</string>
+    <string name="sticker_fav_off">Removed from favourites</string>
+    <string name="sticker_sent">Sticker sent</string>
+    <string name="sticker_copied">Sticker copied. Paste it in the app.</string>
+    <string name="sticker_unsupported">This app cannot take a picture, so the sticker was copied instead</string>
+    <string name="sticker_count">%1$d stickers</string>
+    <string name="sticker_more">Showing the first %1$d matches</string>
+    <string name="sticker_pack_count">%1$d stickers in %2$d packs</string>
+    <string name="section_stickers">Stickers</string>
+    <string name="screen_stickers">Stickers</string>
+    <string name="tile_stickers_sub">Searchable packs for every chat</string>
+    <string name="sticker_screen_desc">Tap a sticker to preview and copy it. Long-press one in the keyboard to keep it in Favourites. Every pack is bundled, so no sticker ever leaves the phone.</string>
+    <string name="sticker_preview_copy">Copy</string>
+    <string name="sticker_preview_fav">Favourite</string>
+    <string name="sticker_preview_unfav">Unfavourite</string>
+    <string name="sticker_preview_close">Close</string>
+    <string name="sticker_license">Sticker artwork by Microsoft Fluent Emoji, MIT licence.</string>
 </resources>

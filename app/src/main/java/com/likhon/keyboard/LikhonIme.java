@@ -2,6 +2,7 @@ package com.likhon.keyboard;
 
 import android.Manifest;
 import android.content.ClipData;
+import android.content.ClipDescription;
 import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -11,6 +12,8 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.inputmethodservice.InputMethodService;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -26,6 +29,7 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.ExtractedText;
 import android.view.inputmethod.ExtractedTextRequest;
 import android.view.inputmethod.InputConnection;
+import android.view.inputmethod.InputContentInfo;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
@@ -95,6 +99,8 @@ public class LikhonIme extends InputMethodService
     private TextView clipCount;
     private LinearLayout translatePanel;
     private LinearLayout morePanel;
+    private StickerPanel stickerPanel;
+    private StickerStore stickerStore;
     private TextView translateTitle;
     private TextView translateSourceView;
     private TextView translateResultView;
@@ -193,6 +199,7 @@ public class LikhonIme extends InputMethodService
         suggestions = new Suggestions(this);
         learned = new LearnedWords(this);
         clips = new ClipStore(this);
+        stickerStore = new StickerStore(this);
         shortcuts = new Shortcuts(this);
         undoStack = new UndoStack();
         toolBar = buildToolBar();
@@ -610,6 +617,30 @@ public class LikhonIme extends InputMethodService
         if (key == null) {
             return;
         }
+        // While the sticker search is live the keys write into the panel's
+        // search field instead of the editor, so searching never needs a
+        // second window or a second keyboard.
+        if (stickerPanel != null && stickerPanel.isSearching()) {
+            switch (key.type) {
+                case Key.CHAR:
+                    stickerPanel.typeToSearch(key.output);
+                    return;
+                case Key.DELETE:
+                    stickerPanel.backspaceSearch();
+                    return;
+                case Key.SPACE:
+                    stickerPanel.typeToSearch(" ");
+                    return;
+                case Key.ENTER:
+                    stickerPanel.stopSearch();
+                    return;
+                case Key.EMOJI:
+                    stickerPanel.stopSearch();
+                    break;
+                default:
+                    break;
+            }
+        }
         switch (key.type) {
             case Key.CHAR:
                 type(key.output);
@@ -945,6 +976,7 @@ public class LikhonIme extends InputMethodService
         toolButton(bar, R.drawable.ic_copy, R.string.action_copy, this::copyToClipboard);
         toolButton(bar, R.drawable.ic_paste, R.string.action_paste, this::pasteFromClipboard);
         toolButton(bar, R.drawable.ic_translate, R.string.action_translate, this::toggleTranslatePanel);
+        toolButton(bar, R.drawable.ic_sticker, R.string.action_stickers, this::toggleStickerPanel);
         toolButton(bar, R.drawable.ic_more, R.string.action_more, this::toggleMorePanel);
         toolButton(bar, R.drawable.ic_settings, R.string.action_settings, this::openSettings);
         refreshToolbar();
@@ -1037,9 +1069,14 @@ public class LikhonIme extends InputMethodService
     }
 
     private void hidePanels() {
+        boolean hadStickers = stickerPanel != null;
         if (panelHost != null) {
             panelHost.removeAllViews();
             panelHost.setVisibility(View.GONE);
+        }
+        stickerPanel = null;
+        if (hadStickers) {
+            updateSuggestions();
         }
     }
 
@@ -1197,6 +1234,118 @@ public class LikhonIme extends InputMethodService
         Toast.makeText(this, prefs.incognito()
                 ? R.string.incognito_on : R.string.incognito_off, Toast.LENGTH_SHORT).show();
         hidePanels();
+    }
+
+    // --------------------------------------------------------------- stickers
+
+    private final StickerPanel.Listener stickerListener = new StickerPanel.Listener() {
+        @Override
+        public void onSticker(StickerLibrary.Item item) {
+            sendSticker(item);
+        }
+
+        @Override
+        public void onClose() {
+            hidePanels();
+        }
+
+        @Override
+        public void onSearchStarted() {
+            finishWord();
+            hideCandidates();
+            if (page != Layouts.PAGE_LETTERS && page != Layouts.PAGE_SYMBOLS) {
+                page = Layouts.PAGE_LETTERS;
+                refreshLayout();
+            }
+        }
+
+        @Override
+        public void onSearchEnded() {
+            // Suggestions come back when the whole panel closes: flipping the
+            // candidate strip in and out here would move the sheet under the
+            // finger.
+        }
+    };
+
+    private void toggleStickerPanel() {
+        if (stickerPanel != null && stickerPanel.getParent() != null) {
+            hidePanels();
+            return;
+        }
+        hidePanels();
+        hideCandidates();
+        if (stickerStore == null) {
+            stickerStore = new StickerStore(this);
+        }
+        StickerPanel panel = new StickerPanel(this, palette, stickerStore,
+                prefs.haptic(), stickerListener);
+        stickerPanel = panel;
+        panelHost.addView(panel, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        panelHost.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * Hands a sticker to the app. Modern apps take it as a picture through
+     * {@code commitContent}; everything else gets the same image on the
+     * clipboard, ready to paste. Nothing is uploaded anywhere.
+     */
+    private void sendSticker(StickerLibrary.Item item) {
+        if (item == null) {
+            return;
+        }
+        Uri uri = StickerProvider.uriFor(item);
+        try {
+            // Copy out of the APK first: the app may read the URI immediately.
+            StickerProvider.fileFor(this, item);
+        } catch (java.io.IOException ignored) {
+            // The provider will report the missing file if it is really gone.
+        }
+
+        boolean sent = false;
+        InputConnection ic = getCurrentInputConnection();
+        boolean acceptsImages = false;
+        EditorInfo info = getCurrentInputEditorInfo();
+        if (info != null && info.contentMimeTypes != null) {
+            for (String type : info.contentMimeTypes) {
+                if (type != null && (type.startsWith("image/") || "*/*".equals(type))) {
+                    acceptsImages = true;
+                    break;
+                }
+            }
+        }
+        if (acceptsImages && ic != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
+            try {
+                ClipDescription description = new ClipDescription(
+                        item.name(banglaUi()), new String[]{"image/webp", "image/*"});
+                InputContentInfo content = new InputContentInfo(uri, description, null);
+                sent = ic.commitContent(content,
+                        InputConnection.INPUT_CONTENT_GRANT_READ_URI_PERMISSION, null);
+            } catch (RuntimeException ignored) {
+                sent = false;
+            }
+        }
+        if (sent) {
+            Toast.makeText(this, R.string.sticker_sent, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        ClipboardManager clipboard =
+                (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (clipboard == null) {
+            return;
+        }
+        clipboard.setPrimaryClip(ClipData.newUri(getContentResolver(),
+                item.name(banglaUi()), uri));
+        Toast.makeText(this, acceptsImages
+                        ? R.string.sticker_copied : R.string.sticker_unsupported,
+                Toast.LENGTH_SHORT).show();
+    }
+
+    private boolean banglaUi() {
+        Locale locale = Locale.getDefault();
+        return locale != null && "bn".equals(locale.getLanguage());
     }
 
     private void toggleMorePanel() {

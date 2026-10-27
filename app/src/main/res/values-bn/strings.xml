@@ -45,7 +45,7 @@
 
     <string name="section_about">সম্পর্কে</string>
     <string name="about_body">লিখন একটি ছোট, অফলাইন কীবোর্ড। এতে বিজ্ঞাপন নেই এবং কোথাও কিছু পাঠায় না; মাইক্রোফোন কেবল ভয়েস টাইপিংয়ে ব্যবহার হয়। ইংরেজি সাধারণ QWERTY লেআউট; বাংলা ফোনেটিক, অর্থাৎ ইংরেজি অক্ষরে যেভাবে উচ্চারণ হয় সেভাবে লিখলেই বাংলা হয়।</string>
-    <string name="about_version">সংস্করণ ২.০</string>
+    <string name="about_version">সংস্করণ ২.১</string>
     <string name="footer">অফলাইন · বিজ্ঞাপন নেই · মাইক অনুমতি ঐচ্ছিক</string>
     <string name="about_guide">বাংলা টাইপিং নির্দেশিকা</string>
 
@@ -245,7 +245,7 @@
     <string name="theme_glacier">গ্লেসিয়ার</string>
     <string name="theme_neon">নিয়ন</string>
     <string name="theme_graphite">গ্রাফাইট</string>
-    <string name="hero_version">v২.০</string>
+    <string name="hero_version">v২.১</string>
     <string name="key_gap">কী-এর ফাঁক</string>
     <string name="gap_compact">ঘন</string>
     <string name="gap_normal">স্বাভাবিক</string>
@@ -289,4 +289,34 @@
     <string name="action_back">ফিরে যান</string>
     <string name="dialog_cancel">বাতিল</string>
     <string name="dialog_ok">ঠিক আছে</string>
+
+    <!-- Stickers -->
+    <string name="action_stickers">স্টিকার</string>
+    <string name="sticker_title">স্টিকার</string>
+    <string name="sticker_search_hint">স্টিকার খুঁজুন</string>
+    <string name="sticker_search_tip">লিখে খুঁজুন</string>
+    <string name="sticker_clear">সার্চ মুছুন</string>
+    <string name="sticker_close">স্টিকার বন্ধ করুন</string>
+    <string name="sticker_recent">সাম্প্রতিক</string>
+    <string name="sticker_favorites">প্রিয়</string>
+    <string name="sticker_no_result">কোনো স্টিকার পাওয়া যায়নি</string>
+    <string name="sticker_no_favorites">প্রিয়তে রাখতে স্টিকার চেপে ধরুন</string>
+    <string name="sticker_no_recent">যে স্টিকার পাঠাবেন সেগুলো এখানে থাকবে</string>
+    <string name="sticker_fav_on">প্রিয়তে যোগ হয়েছে</string>
+    <string name="sticker_fav_off">প্রিয় থেকে সরানো হয়েছে</string>
+    <string name="sticker_sent">স্টিকার পাঠানো হয়েছে</string>
+    <string name="sticker_copied">স্টিকার কপি হয়েছে। অ্যাপে পেস্ট করুন।</string>
+    <string name="sticker_unsupported">এই অ্যাপ ছবি নিতে পারে না, তাই স্টিকারটি কপি করা হয়েছে</string>
+    <string name="sticker_count">%1$dটি স্টিকার</string>
+    <string name="sticker_more">প্রথম %1$dটি ফলাফল দেখানো হচ্ছে</string>
+    <string name="sticker_pack_count">%2$dটি প্যাকে %1$dটি স্টিকার</string>
+    <string name="section_stickers">স্টিকার</string>
+    <string name="screen_stickers">স্টিকার</string>
+    <string name="tile_stickers_sub">সব চ্যাটের জন্য সার্চযোগ্য প্যাক</string>
+    <string name="sticker_screen_desc">স্টিকারে ট্যাপ করে প্রিভিউ দেখুন আর কপি করুন। কীবোর্ডে চেপে ধরলে প্রিয়তে জমা হবে। সব প্যাক অ্যাপের ভেতরেই থাকে, কোনো স্টিকার ফোনের বাইরে যায় না।</string>
+    <string name="sticker_preview_copy">কপি</string>
+    <string name="sticker_preview_fav">প্রিয় করুন</string>
+    <string name="sticker_preview_unfav">প্রিয় থেকে সরান</string>
+    <string name="sticker_preview_close">বন্ধ</string>
+    <string name="sticker_license">স্টিকার আর্ট: Microsoft Fluent Emoji, MIT লাইসেন্স।</string>
 </resources>

@@ -47,6 +47,14 @@
             android:excludeFromRecents="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <!-- Serves the bundled sticker art to the app that receives a sticker
+             (InputConnection.commitContent or the clipboard). Read-only. -->
+        <provider
+            android:name=".StickerProvider"
+            android:authorities="com.likhon.keyboard.stickers"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+
         <service
             android:name=".LikhonIme"
             android:exported="true"

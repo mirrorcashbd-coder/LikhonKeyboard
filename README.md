@@ -6,14 +6,14 @@ no AndroidX, no third-party libraries, no ads, and nothing of its own ever goes
 online (the `INTERNET` permission is declared only for speech services that run
 inside the calling app).
 
-**APK:** `build/manual/LikhonKeyboard-2.0.apk` (also copied to
-`/sdcard/Download/LikhonKeyboard-2.0.apk`)
+**APK:** `build/manual/LikhonKeyboard-2.1.apk` (also copied to
+`/sdcard/Download/LikhonKeyboard-2.1.apk`)
 
 ---
 
 ## Install
 
-1. Open `LikhonKeyboard-2.0.apk` in the Files app and allow "install unknown apps"
+1. Open `LikhonKeyboard-2.1.apk` in the Files app and allow "install unknown apps"
    for that app if asked.
 2. Open **Likhon Keyboard** from the app drawer.
 3. Tap **Enable keyboard** → turn on "Likhon Keyboard".
@@ -26,6 +26,8 @@ the keyboard to open settings at any time.
 ## What it does
 
 - **English QWERTY** with shift, caps-lock (double-tap shift), symbols, emoji.
+- **Stickers**: nine packs, 152 Fluent Emoji 3D stickers, searchable from
+  the keyboard in English or Bangla.
 - **Phonetic Bangla**: type the sound in English letters, get Bangla as you
   type (`ami` → আমি, `kemon` → কেমন). Capitals give the retroflex / long forms
   (`T` → ট, `D` → ড, `N` → ণ, `S` → ষ, `R` → ড়, `O` → ও, `I` → ঈ, `U` → ঊ).
@@ -137,6 +139,44 @@ A thin row above the suggestions holds the editing tools:
 
 The clipboard panel and the translator share one strip under the suggestions,
 so the keyboard never leaves the screen for them either.
+
+## Stickers
+
+Nine packs and 152 stickers ship inside the APK, so the panel opens instantly
+and no image ever needs a network.
+
+| Pack | Stickers | Examples |
+| --- | --- | --- |
+| Moods | 20 | grin, tears of joy, thinking, mind blown |
+| Love | 18 | hearts, love letter, rose, ring |
+| Party | 16 | popper, cake, gift, trophy |
+| Animals | 18 | cat, panda, fox, penguin |
+| Food | 18 | pizza, ramen, bubble tea, watermelon |
+| Nature | 14 | sun, moon, rainbow, snow |
+| Work | 16 | laptop, rocket, idea, money |
+| Hands | 14 | thumbs up, clap, wave, pray |
+| Reactions | 18 | fire, 100, eyes, skull |
+
+Tap the sticker icon in the editing toolbar to open the sheet:
+
+- **Search** — tap the search pill and start typing on the keyboard itself. The
+  IME routes the keys into the query instead of the editor, so English, Bangla
+  or a mix all work (`লাল heart`). Every word has to match, and the grid narrows
+  as you type. Enter or ✕ leaves search.
+- **Packs** — chips for Recent, Favourites and each pack. The selected chip is
+  accent-filled.
+- **Recents** — the last 60 stickers you sent, newest first, never trimmed by
+  time.
+- **Favourites** — long-press any sticker to add or remove it; a small accent
+  dot marks favourites in every grid.
+- **Sending** — apps that accept pictures (WhatsApp, Telegram, Gmail, …) get
+  the sticker through `InputConnection.commitContent`. In a plain text field
+  the same image goes to the clipboard instead, ready to paste. In both cases
+  it is served by a read-only `content://` provider (`StickerProvider`), never
+  uploaded.
+
+Settings → Stickers has the same library with pack chips, live search, a large
+preview and copy/favourite actions.
 
 ## Word suggestions
 
@@ -274,7 +314,12 @@ app/src/main/java/com/likhon/keyboard/
   Prefs.java            typed SharedPreferences
   SettingsActivity.java setup + settings screen (code-built UI)
   Ui.java               small view/drawable helpers
-app/src/main/assets/    English + Bangla word lists for suggestions
+  StickerLibrary.java   sticker catalogue (bundled JSON) + bitmap cache
+  StickerStore.java     favourites and the recent stickers list
+  StickerProvider.java  read-only content:// image for the receiving app
+  StickerPanel.java     sticker sheet: search, pack chips, grid
+app/src/main/assets/    English + Bangla word lists for suggestions,
+                        stickers/ (152 WebP files + catalogue)
 app/src/main/res/       manifest resources, method.xml, strings (en + bn), icons
 tools/                  icon generator, phonetic/voice checks, suggestion index,
                         ARM64 APK build
@@ -414,6 +459,13 @@ dexed straight into the APK by both build paths:
 bash tools/add-lib.sh com.squareup.okhttp3:okhttp:3.14.9
 ```
 
+The sticker artwork is Microsoft's **Fluent Emoji 3D** set
+(https://github.com/microsoft/fluentui-emoji, MIT licence). It is not a
+dependency: `tools/build-stickers.py` downloads the chosen PNGs once, trims them
+to 192×192 WebP, and writes `assets/stickers/stickers.json` with the packs,
+English/Bangla names and search tags. The app only ever reads those bundled
+files, and the About screen credits the artwork.
+
 A plain JAR is copied as is; an AAR is unpacked and its `classes.jar` is kept.
 AAR **resources** need the aapt2 pipeline (aapt2 2.19 runs on this phone), so a
 specific resource-carrying library can be wired in on request. AndroidX and
@@ -442,6 +494,7 @@ AndroidX dependency:
 | `M3Switch` | Hand-drawn switch: solid track, white thumb with a short soft shadow. |
 | `AppDialog` | Solid rounded dialog, dimmed backdrop, scale/fade entrance. |
 | `KeyboardView` | Canvas keyboard: opaque key caps, shadows, press wave, sheen, previews. |
+| `StickerPanel` | Sticker sheet: search pill with a blinking caret, pack chips, six-column grid, long-press favourites. |
 
 Motion is small and honest: buttons squash to 97% on touch, keys spring and
 ripple, screens slide sideways, dialogs scale in. Everything is switched off
@@ -449,6 +502,23 @@ when the system animation scale is zero, and every interactive control keeps a
 48 dp touch target and a content description.
 
 ## Changes
+
+**2.1**
+
+- Sticker system: nine packs, 152 Microsoft Fluent Emoji 3D stickers bundled as
+  192 px WebP (about 1 MB), with a searchable panel above the keys.
+- Search without a second window: tapping the field routes the keyboard's own
+  keys into the query, so English, Bangla or both work (`লাল heart`); the caret
+  blinks and Enter leaves search.
+- Recents (last 60, never auto-deleted) and Favourites (long-press a sticker;
+  accent dot in every grid).
+- Stickers go to picture-aware apps through `InputConnection.commitContent` and
+  to every other field through the clipboard, served by a new read-only
+  `StickerProvider` (`content://com.likhon.keyboard.stickers/...`).
+- Settings → Stickers: hero card with a preview strip, pack chips, live search,
+  big preview dialog with favourite and copy.
+- Home now has eight tiles (Stickers and About joined the grid) and the About
+  screen credits the Fluent Emoji artwork.
 
 **2.0**
 

@@ -2,6 +2,7 @@ package com.likhon.keyboard;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.Dialog;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -9,9 +10,11 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
@@ -26,15 +29,19 @@ import android.provider.Settings;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
+import android.text.Editable;
 import android.text.InputType;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowManager;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -47,6 +54,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -81,6 +89,7 @@ public class SettingsActivity extends Activity {
     private static final String SCREEN_LANGUAGES = "languages";
     private static final String SCREEN_VOICE = "voice";
     private static final String SCREEN_TOOLS = "tools";
+    private static final String SCREEN_STICKERS = "stickers";
     private static final String SCREEN_BACKUP = "backup";
     private static final String SCREEN_ABOUT = "about";
 
@@ -106,6 +115,15 @@ public class SettingsActivity extends Activity {
     private TextView learnedCount;
     private LinearLayout languageChips;
     private TextView languageNow;
+
+    /** Sticker screen state: selected pack id (null = all) and query. */
+    private String stickerFilter;
+    private String stickerQuery = "";
+    private LinearLayout stickerChips;
+    private LinearLayout stickerGrid;
+    private TextView stickerCountView;
+    private EditText stickerSearch;
+    private StickerStore stickerStore;
     private SpeechRecognizer speechTest;
     private final Handler testHandler = new Handler(Looper.getMainLooper());
     private final Runnable speechTimeout = () ->
@@ -447,6 +465,7 @@ public class SettingsActivity extends Activity {
         screens.put(SCREEN_LANGUAGES, buildLanguagesScreen());
         screens.put(SCREEN_VOICE, buildVoiceScreen());
         screens.put(SCREEN_TOOLS, buildToolsScreen());
+        screens.put(SCREEN_STICKERS, buildStickersScreen());
         screens.put(SCREEN_BACKUP, buildBackupScreen());
         screens.put(SCREEN_ABOUT, buildAboutScreen());
     }
@@ -574,10 +593,19 @@ public class SettingsActivity extends Activity {
                         getString(R.string.screen_tools),
                         getString(R.string.tile_tools_sub),
                         () -> open(SCREEN_TOOLS)),
+                M3.tile(this, palette, R.drawable.ic_sticker,
+                        getString(R.string.section_stickers),
+                        getString(R.string.tile_stickers_sub),
+                        () -> open(SCREEN_STICKERS)));
+        addTileRow(grid,
                 M3.tile(this, palette, R.drawable.ic_archive,
                         getString(R.string.section_backup),
                         getString(R.string.tile_backup_sub),
-                        () -> open(SCREEN_BACKUP)));
+                        () -> open(SCREEN_BACKUP)),
+                M3.tile(this, palette, R.drawable.ic_info,
+                        getString(R.string.section_about),
+                        getString(R.string.about_short),
+                        () -> open(SCREEN_ABOUT)));
         body.addView(grid);
 
         // ---------------------------------------------------------- more rows
@@ -591,10 +619,6 @@ public class SettingsActivity extends Activity {
         more.addView(M3.navRow(this, palette, R.drawable.ic_keyboard,
                 getString(R.string.home_keyboard), getString(R.string.home_keyboard_sub),
                 this::openKeyboardSettings));
-        more.addView(M3.divider(this, palette));
-        more.addView(M3.navRow(this, palette, R.drawable.ic_settings,
-                getString(R.string.section_about), getString(R.string.about_short),
-                () -> open(SCREEN_ABOUT)));
         addCard(body, more);
 
         // ------------------------------------------------------- try-it card
@@ -894,6 +918,373 @@ public class SettingsActivity extends Activity {
 
     // --------------------------------------------------------- backup screen
 
+    // --------------------------------------------------------------- stickers
+
+    private View buildStickersScreen() {
+        final StickerLibrary library = StickerLibrary.get(this);
+        LinearLayout body = M3.body(this);
+
+        // ------------------------------------------------------------- hero
+        LinearLayout hero = M3.card(this, palette);
+        hero.addView(Ui.text(this, getString(R.string.sticker_pack_count,
+                library.items().size(), library.packs().size()), 20, palette.text, true));
+        TextView description = Ui.text(this, getString(R.string.sticker_screen_desc),
+                12.5f, palette.textMuted, false);
+        description.setPadding(0, dp(8), 0, 0);
+        hero.addView(description);
+
+        List<StickerLibrary.Item> all = library.items();
+        LinearLayout strip = Ui.horizontal(this);
+        for (int i = 0; i < 5 && i < all.size(); i++) {
+            StickerLibrary.Item item = all.get((i * 31 + 4) % all.size());
+            ImageView art = new ImageView(this);
+            art.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            art.setImageBitmap(library.bitmap(item, 2));
+            LinearLayout.LayoutParams artParams = new LinearLayout.LayoutParams(
+                    0, dp(46), 1f);
+            if (i > 0) {
+                artParams.leftMargin = dp(6);
+            }
+            strip.addView(art, artParams);
+        }
+        LinearLayout.LayoutParams stripParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        stripParams.topMargin = dp(14);
+        hero.addView(strip, stripParams);
+        addCard(body, hero);
+
+        // ----------------------------------------------------------- search
+        stickerSearch = new EditText(this);
+        stickerSearch.setSingleLine(true);
+        stickerSearch.setTextSize(14);
+        stickerSearch.setTextColor(palette.text);
+        stickerSearch.setHintTextColor(palette.textMuted);
+        stickerSearch.setHint(getString(R.string.sticker_search_hint));
+        stickerSearch.setBackground(Surfaces.control(this, palette, 14,
+                Surfaces.muted(palette), Surfaces.border(palette),
+                (palette.accent & 0x00FFFFFF) | 0x24000000));
+        stickerSearch.setPadding(dp(12), dp(10), dp(12), dp(10));
+        stickerSearch.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_search, 0, 0, 0);
+        stickerSearch.setCompoundDrawablePadding(dp(9));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            stickerSearch.setCompoundDrawableTintList(
+                    ColorStateList.valueOf(palette.textMuted));
+        }
+        stickerSearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                stickerQuery = s == null ? "" : s.toString();
+                rebuildStickerGrid();
+            }
+        });
+        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        searchParams.topMargin = dp(14);
+        body.addView(stickerSearch, searchParams);
+
+        // ------------------------------------------------------------ chips
+        HorizontalScrollView chipScroll = new HorizontalScrollView(this);
+        chipScroll.setHorizontalScrollBarEnabled(false);
+        chipScroll.setClipToPadding(false);
+        chipScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        stickerChips = Ui.horizontal(this);
+        chipScroll.addView(stickerChips, new HorizontalScrollView.LayoutParams(
+                HorizontalScrollView.LayoutParams.WRAP_CONTENT,
+                HorizontalScrollView.LayoutParams.WRAP_CONTENT));
+        LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        chipParams.topMargin = dp(12);
+        body.addView(chipScroll, chipParams);
+
+        stickerCountView = Ui.text(this, "", 11.5f, palette.textMuted, true);
+        stickerCountView.setPadding(dp(2), dp(14), 0, dp(2));
+        body.addView(stickerCountView);
+
+        stickerGrid = Ui.vertical(this);
+        body.addView(stickerGrid, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        TextView license = Ui.text(this, getString(R.string.sticker_license),
+                11, palette.textMuted, false);
+        license.setPadding(0, dp(20), 0, 0);
+        body.addView(license);
+
+        if (stickerFilter == null && !library.packs().isEmpty()) {
+            stickerFilter = library.packs().get(0).id;
+        }
+        rebuildStickerChips();
+        rebuildStickerGrid();
+
+        return subScreen(R.string.screen_stickers, R.string.tile_stickers_sub, body);
+    }
+
+    private void rebuildStickerChips() {
+        if (stickerChips == null) {
+            return;
+        }
+        stickerChips.removeAllViews();
+        StickerLibrary library = StickerLibrary.get(this);
+        boolean bangla = banglaUi();
+        for (StickerLibrary.Pack pack : library.packs()) {
+            final String id = pack.id;
+            boolean selected = pack.id.equals(stickerFilter);
+            TextView chip = M3.chip(this, palette, pack.name(bangla), selected, () -> {
+                stickerFilter = id;
+                if (stickerQuery != null && !stickerQuery.isEmpty() && stickerSearch != null) {
+                    // Clears the field; the text watcher rebuilds the grid.
+                    stickerSearch.setText("");
+                }
+                rebuildStickerChips();
+                rebuildStickerGrid();
+            });
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            params.rightMargin = dp(6);
+            stickerChips.addView(chip, params);
+        }
+    }
+
+    /** Rebuilds the visible sticker grid; called by chips and the search box. */
+    private void rebuildStickerGrid() {
+        if (stickerGrid == null || stickerCountView == null) {
+            return;
+        }
+        StickerLibrary library = StickerLibrary.get(this);
+        List<StickerLibrary.Item> found;
+        if (stickerQuery != null && !stickerQuery.trim().isEmpty()) {
+            found = library.search(stickerQuery);
+        } else if (stickerFilter == null) {
+            found = library.items();
+        } else {
+            found = library.ofPack(stickerFilter);
+        }
+
+        int total = found.size();
+        int limit = 48;
+        boolean clipped = total > limit;
+        List<StickerLibrary.Item> shown = clipped ? found.subList(0, limit) : found;
+
+        stickerCountView.setText(getString(R.string.sticker_count, total));
+        stickerGrid.removeAllViews();
+
+        int columns = 5;
+        LinearLayout row = null;
+        for (int i = 0; i < shown.size(); i++) {
+            if (i % columns == 0) {
+                row = Ui.horizontal(this);
+                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT);
+                if (i > 0) {
+                    rowParams.topMargin = dp(6);
+                }
+                stickerGrid.addView(row, rowParams);
+            }
+            final StickerLibrary.Item item = shown.get(i);
+            FrameLayout cell = new FrameLayout(this);
+            cell.setBackground(Surfaces.control(this, palette, 14,
+                    Palette.mix(palette.surface, palette.bg, palette.dark ? 0.3f : 0.45f),
+                    0, (palette.text & 0x00FFFFFF) | 0x16000000));
+            cell.setPadding(dp(5), dp(5), dp(5), dp(5));
+
+            ImageView art = new ImageView(this);
+            art.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            art.setImageBitmap(library.bitmap(item, 2));
+            cell.addView(art, new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT));
+
+            if (stickerFavorites().isFavorite(item.id)) {
+                View dot = new View(this);
+                dot.setBackground(Ui.rounded(this, palette.accent, 2.5f));
+                FrameLayout.LayoutParams dotParams = new FrameLayout.LayoutParams(
+                        dp(5), dp(5), Gravity.TOP | Gravity.END);
+                dotParams.topMargin = dp(3);
+                dotParams.rightMargin = dp(3);
+                cell.addView(dot, dotParams);
+            }
+
+            cell.setContentDescription(item.name(banglaUi()));
+            cell.setClickable(true);
+            cell.setFocusable(true);
+            cell.setOnClickListener(v -> showStickerPreview(item));
+            M3.pressScale(cell);
+
+            LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(
+                    0, dp(58), 1f);
+            if (i % columns < columns - 1) {
+                cellParams.rightMargin = dp(6);
+            }
+            row.addView(cell, cellParams);
+        }
+        if (row != null) {
+            for (int i = shown.size() % columns; i > 0 && i < columns; i++) {
+                row.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
+            }
+        }
+        if (clipped) {
+            TextView note = Ui.text(this, getString(R.string.sticker_more, limit),
+                    11.5f, palette.textMuted, false);
+            note.setGravity(Gravity.CENTER);
+            note.setPadding(0, dp(10), 0, 0);
+            stickerGrid.addView(note);
+        }
+    }
+
+    private StickerStore stickerFavorites() {
+        if (stickerStore == null) {
+            stickerStore = new StickerStore(this);
+        }
+        return stickerStore;
+    }
+
+    /** Big preview with favourite and copy actions. */
+    private void showStickerPreview(StickerLibrary.Item item) {
+        final Dialog dialog = new Dialog(this, android.R.style.Theme_Translucent_NoTitleBar);
+        final boolean bangla = banglaUi();
+        StickerLibrary library = StickerLibrary.get(this);
+
+        LinearLayout panel = Ui.vertical(this);
+        panel.setBackground(Surfaces.surface(this, palette, 26));
+        panel.setPadding(dp(20), dp(16), dp(20), dp(16));
+        panel.setGravity(Gravity.CENTER_HORIZONTAL);
+
+        LinearLayout head = Ui.horizontal(this);
+        TextView packName = Ui.text(this,
+                library.pack(item.pack) == null ? "" : library.pack(item.pack).name(bangla),
+                11.5f, palette.textMuted, true);
+        head.addView(packName, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        ImageView close = M3.icon(this, R.drawable.ic_close, palette.textMuted);
+        close.setContentDescription(getString(R.string.sticker_preview_close));
+        close.setPadding(dp(6), dp(6), dp(6), dp(6));
+        close.setBackground(Ui.ripple(this, Color.TRANSPARENT, 14,
+                (palette.text & 0x00FFFFFF) | 0x1A000000));
+        close.setOnClickListener(v -> dialog.dismiss());
+        head.addView(close, new LinearLayout.LayoutParams(dp(28), dp(28)));
+        panel.addView(head, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        ImageView art = new ImageView(this);
+        art.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        art.setImageBitmap(library.bitmap(item));
+        LinearLayout.LayoutParams artParams = new LinearLayout.LayoutParams(
+                dp(136), dp(136));
+        artParams.topMargin = dp(6);
+        panel.addView(art, artParams);
+
+        TextView name = Ui.text(this, item.name(bangla), 18, palette.text, true);
+        name.setGravity(Gravity.CENTER);
+        panel.addView(name, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout actions = Ui.horizontal(this);
+        final TextView fav = M3.tonalButton(this, palette,
+                getString(stickerFavorites().isFavorite(item.id)
+                        ? R.string.sticker_preview_unfav : R.string.sticker_preview_fav),
+                () -> { });
+        fav.setOnClickListener(v -> {
+            boolean now = stickerFavorites().toggleFavorite(item.id);
+            fav.setText(getString(now
+                    ? R.string.sticker_preview_unfav : R.string.sticker_preview_fav));
+            rebuildStickerGrid();
+        });
+        TextView copy = M3.filledButton(this, palette,
+                getString(R.string.sticker_preview_copy), () -> copySticker(item));
+        LinearLayout.LayoutParams favParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        favParams.rightMargin = dp(8);
+        actions.addView(fav, favParams);
+        actions.addView(copy, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        actionsParams.topMargin = dp(16);
+        panel.addView(actions, actionsParams);
+
+        FrameLayout root = new FrameLayout(this);
+        int side = dp(24);
+        root.setPadding(side, side, side, side);
+        root.addView(panel, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
+        dialog.setContentView(root);
+
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(0x00000000));
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams params = window.getAttributes();
+            params.dimAmount = 0.55f;
+            window.setAttributes(params);
+            window.setWindowAnimations(0);
+        }
+        dialog.setOnShowListener(d -> {
+            Window shown = dialog.getWindow();
+            if (shown != null) {
+                shown.setLayout(WindowManager.LayoutParams.MATCH_PARENT,
+                        WindowManager.LayoutParams.WRAP_CONTENT);
+            }
+        });
+        dialog.show();
+        if (!motionDisabled()) {
+            panel.setAlpha(0f);
+            panel.setScaleX(0.94f);
+            panel.setScaleY(0.94f);
+            panel.animate().alpha(1f).scaleX(1f).scaleY(1f)
+                    .setDuration(200)
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator(1.6f))
+                    .start();
+        }
+    }
+
+    private void copySticker(StickerLibrary.Item item) {
+        try {
+            StickerProvider.fileFor(this, item);
+        } catch (java.io.IOException ignored) {
+            return;
+        }
+        ClipboardManager clipboard =
+                (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard == null) {
+            return;
+        }
+        clipboard.setPrimaryClip(ClipData.newUri(getContentResolver(),
+                item.name(banglaUi()), StickerProvider.uriFor(item)));
+        Toast.makeText(this, R.string.sticker_copied, Toast.LENGTH_SHORT).show();
+    }
+
+    private boolean banglaUi() {
+        Locale locale = Locale.getDefault();
+        return locale != null && "bn".equals(locale.getLanguage());
+    }
+
+    private boolean motionDisabled() {
+        try {
+            float scale = Settings.Global.getFloat(getContentResolver(),
+                    Settings.Global.ANIMATOR_DURATION_SCALE, 1f);
+            return scale == 0f;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
     private View buildBackupScreen() {
         LinearLayout body = M3.body(this);
 
@@ -959,6 +1350,11 @@ public class SettingsActivity extends Activity {
                 palette.textMuted, false);
         libraries.setPadding(0, dp(10), 0, 0);
         aboutCard.addView(libraries);
+
+        TextView stickers = Ui.text(this, getString(R.string.sticker_license), 11.5f,
+                palette.textMuted, false);
+        stickers.setPadding(0, dp(6), 0, 0);
+        aboutCard.addView(stickers);
         addSection(body, getString(R.string.section_about), null, aboutCard);
 
         LinearLayout links = M3.bareCard(this, palette);
