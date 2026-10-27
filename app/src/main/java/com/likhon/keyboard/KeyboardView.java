@@ -63,16 +63,10 @@ public class KeyboardView extends View {
     private static final long RIPPLE_MS = 340;
     private static final long SHEEN_MS = 820;
 
-    private final Paint glossPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint rimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint fxPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path clipPath = new Path();
     private final List<PressRipple> ripples = new ArrayList<>();
 
-    private Shader[] rowFill;
-    private Shader[] rowFillSpecial;
-    private Shader[] rowGloss;
-    private Shader[] rowRim;
     private float[][] keyScale;
     private long sheenStart;
     private boolean frameNeeded;
@@ -317,7 +311,6 @@ public class KeyboardView extends View {
             keyRects.add(rects);
             top += rowH + gap;
         }
-        buildKeyShaders();
         keyScale = new float[count][];
         for (int r = 0; r < count; r++) {
             keyScale[r] = new float[keyRects.get(r).size()];
@@ -326,46 +319,6 @@ public class KeyboardView extends View {
             }
         }
         ripples.clear();
-    }
-
-    /**
-     * One set of shaders per row. Every key in a row shares its top and
-     * height, so a single vertical gradient in view coordinates paints the
-     * whole row without allocating a shader per key or per frame.
-     */
-    private void buildKeyShaders() {
-        int count = keyRects.size();
-        rowFill = new Shader[count];
-        rowFillSpecial = new Shader[count];
-        rowGloss = new Shader[count];
-        rowRim = new Shader[count];
-        boolean dark = palette.dark;
-        for (int r = 0; r < count; r++) {
-            List<RectF> rects = keyRects.get(r);
-            if (rects.isEmpty()) {
-                continue;
-            }
-            float top = rects.get(0).top;
-            float bottom = rects.get(0).bottom;
-            if (bottom <= top) {
-                continue;
-            }
-            rowFill[r] = new LinearGradient(0, top, 0, bottom,
-                    ((dark ? 0x18 : 0x40) << 24) | 0x00FFFFFF,
-                    ((dark ? 0x0A : 0x24) << 24) | 0x00FFFFFF,
-                    Shader.TileMode.CLAMP);
-            rowFillSpecial[r] = new LinearGradient(0, top, 0, bottom,
-                    ((dark ? 0x20 : 0x1A) << 24) | 0x00000000,
-                    ((dark ? 0x10 : 0x0C) << 24) | 0x00000000,
-                    Shader.TileMode.CLAMP);
-            rowGloss[r] = new LinearGradient(0, top, 0, top + (bottom - top) * 0.6f,
-                    ((dark ? 0x14 : 0x28) << 24) | 0x00FFFFFF, 0x00000000,
-                    Shader.TileMode.CLAMP);
-            rowRim[r] = new LinearGradient(0, top, 0, bottom, dark
-                    ? new int[]{0x9AFFFFFF, 0x3AFFFFFF, 0x28FFFFFF, 0x66FFFFFF}
-                    : new int[]{0xFFFFFFFF, 0xDCFFFFFF, 0xC8FFFFFF, 0xF6FFFFFF},
-                    null, Shader.TileMode.CLAMP);
-        }
     }
 
     // ------------------------------------------------------------------- draw
@@ -440,41 +393,18 @@ public class KeyboardView extends View {
                 canvas.drawRoundRect(tmpRect, radius + dp(2f), radius + dp(2f), fillPaint);
             }
             fillPaint.setColor(pressed ? palette.accentPressed : palette.accent);
-            canvas.drawRoundRect(r, radius, radius, fillPaint);
         } else {
-            fillPaint.setShader(shaderFor(key.isSpecial() ? rowFillSpecial : rowFill, row));
-            canvas.drawRoundRect(r, radius, radius, fillPaint);
-            fillPaint.setShader(null);
-            if (pressed) {
-                fillPaint.setColor(((palette.dark ? 0x2E : 0x24) << 24)
-                        | (palette.accent & 0x00FFFFFF));
-                canvas.drawRoundRect(r, radius, radius, fillPaint);
-            }
+            fillPaint.setColor(pressed
+                    ? (key.isSpecial() ? palette.keySpecialPressed : palette.keyPressed)
+                    : (key.isSpecial() ? palette.keySpecial : palette.keyBg));
         }
+        fillPaint.setShader(null);
+        canvas.drawRoundRect(r, radius, radius, fillPaint);
 
-        // top sheen: the lit half of a glass cap
-        glossPaint.setShader(shaderFor(rowGloss, row));
-        canvas.drawRoundRect(r, radius, radius, glossPaint);
-        glossPaint.setShader(null);
-
-        // a soft ring of light just inside the edge, then the bright hairline
-        rimPaint.setShader(null);
-        rimPaint.setStrokeWidth(dp(3.4f));
-        rimPaint.setColor(((palette.dark ? 0x1E : 0x26) << 24) | 0x00FFFFFF);
-        tmpRect.set(r);
-        tmpRect.inset(dp(1.7f), dp(1.7f));
-        canvas.drawRoundRect(tmpRect, Math.max(1f, radius - dp(1.7f)),
-                Math.max(1f, radius - dp(1.7f)), rimPaint);
-
-        Shader rim = shaderFor(rowRim, row);
-        if (rim != null) {
-            strokePaint.setShader(rim);
-            strokePaint.setStrokeWidth(dp(keyBorders ? 1.25f : 0.9f));
-        } else {
-            strokePaint.setShader(null);
-            strokePaint.setColor(palette.keyStroke);
-            strokePaint.setStrokeWidth(dp(1f));
-        }
+        // hairline outline: crisp separation instead of a glassy rim
+        strokePaint.setShader(null);
+        strokePaint.setColor(key.isSpecial() ? palette.keyStroke : Surfaces.border(palette));
+        strokePaint.setStrokeWidth(dp(keyBorders ? 1.25f : 1f));
         tmpRect.set(r);
         tmpRect.inset(dp(0.5f), dp(0.5f));
         canvas.drawRoundRect(tmpRect, radius, radius, strokePaint);
@@ -521,9 +451,6 @@ public class KeyboardView extends View {
         }
     }
 
-    private static Shader shaderFor(Shader[] set, int row) {
-        return set != null && row >= 0 && row < set.length ? set[row] : null;
-    }
 
     /** Light spreading out from the finger, clipped to the key it landed on. */
     private void drawRipples(Canvas canvas, long now) {

@@ -6,14 +6,14 @@ no AndroidX, no third-party libraries, no ads, and nothing of its own ever goes
 online (the `INTERNET` permission is declared only for speech services that run
 inside the calling app).
 
-**APK:** `build/manual/LikhonKeyboard-1.10.apk` (also copied to
-`/sdcard/Download/LikhonKeyboard-1.10.apk`)
+**APK:** `build/manual/LikhonKeyboard-2.0.apk` (also copied to
+`/sdcard/Download/LikhonKeyboard-2.0.apk`)
 
 ---
 
 ## Install
 
-1. Open `LikhonKeyboard-1.10.apk` in the Files app and allow "install unknown apps"
+1. Open `LikhonKeyboard-2.0.apk` in the Files app and allow "install unknown apps"
    for that app if asked.
 2. Open **Likhon Keyboard** from the app drawer.
 3. Tap **Enable keyboard** → turn on "Likhon Keyboard".
@@ -341,46 +341,41 @@ every setting to its default without touching the clipboard.
 
 ## Design
 
-The whole app floats on **your own wallpaper**: it is read once, shrunk to a
-few hundred pixels, blurred with three cheap box passes and stretched over the
-screen, so the background is a soft, colourful photo exactly like iOS 27
-liquid glass. When the wallpaper cannot be read, a four-blob colour mesh
-derived from the accent takes its place.
+The whole app is drawn in a **solid, tonal Material 3 language**: no
+transparency, no blur, no photo behind the content. The page is an opaque
+vertical gradient taken from the theme (`bgTop` → `bgBottom`, one flat colour
+for the plain light/dark pair), cards are opaque with a one-pixel outline, and
+colour does the work shadows used to do: accent-filled primary buttons, tonal
+icon containers, accent-filled selected chips and segments.
 
-The keyboard is glass too: every key is a translucent cap with a top sheen, a
-ring of light caught inside the edge, a bright specular hairline, a soft drop
-shadow and a live press animation — the key springs down under the finger, a
-wave of accent light spreads out from the touch point, and a slow sheen sweeps
-across the whole keyboard. Toolbar, suggestion chips, panels and circular icon
-badges are the same glass, and text carries a soft shadow so it stays crisp on
-any wallpaper.
+Each screen opens with a **large title** and a one-line description (and a
+tonal back circle on sub screens) instead of a floating bar, then a single
+scrolling column of cards with 16 dp gutters and 22 dp corners. All eight
+skins (Aurora, Midnight, Paper, Glacier, Neon, Graphite), the plain light/dark
+pair and the six accents drive the same tokens, so every screen looks designed
+rather than themed by accident.
 
-Every settings screen is built from **liquid glass**: translucent panels with a
-diagonal specular rim, a top sheen, a hairline bright edge and a soft elevation
-shadow, floating over a backdrop made of four huge, smooth colour blobs. The
-blobs are already soft, so whatever shows through a panel reads as frosted
-glass without a blur pass.
+The keyboard is solid as well: every key is an **opaque cap** in the theme's
+key colour with a soft drop shadow, a hairline outline and its own pressed
+colour; accent keys (enter, active language, live mic) fill with the accent.
+A tap still springs the key down to 94.5%, sends a short wave of accent light
+out from the finger and sweeps one sheen across the board. The toolbar,
+suggestion chips and the clipboard, translate, more and voice sheets are
+opaque surfaces with the same outline.
 
-The screens are separate, each with its own floating glass top bar, back button,
-slide transition and back stack:
+The screens are separate, each with its own header, slide transition and back
+stack:
 
 | Screen | What lives there |
 | --- | --- |
-| Home | keyboard status, six glass quick tiles, guide and system links |
-| Appearance | glass theme swatches, live preview, accent beads, key shape, size, spacing |
+| Home | keyboard status, six quick tiles, guide and system links |
+| Appearance | theme swatches, live preview, accent beads, key shape, size, spacing |
 | Typing | feedback, suggestions, number row, keyboard height, privacy |
 | Languages | writing mode and all 39 languages |
 | Voice | microphone, recognition engine, live tests and the log |
 | Tools | shortcuts, clipboard, learned words |
 | Backup | export, import and reset |
 | About | version, libraries and the guide |
-
-Buttons, segmented controls, chips, fields and switches are all glass too: a
-raised pill marks the selected segment, the switch has a floating white bead
-with its own shadow, and every control has a bright rim that catches the light
-from the top-left. All of it is derived from the palette, so the six designed
-skins (Aurora, Midnight, Paper, Glacier, Neon, Graphite), the plain light/dark
-pair and all accent colours work on every screen.
 
 ## Languages
 
@@ -434,55 +429,40 @@ The toolbar uses Material Design line icons as vector drawables
 with the current theme. Every tap plays a short squash-and-settle animation and
 undo/redo pivot to show the way the history moved.
 
-## Liquid glass components
+## Design system
 
-A second, fully reusable glass system lives beside the older painter and is
-what the demo screen is built from. Everything is plain Java on Canvas, no
-AndroidX, no Compose, no layout XML:
+Every widget is built in code; there is no layout XML, no Compose and no
+AndroidX dependency:
 
-| Class | What it is |
+| Class | Role |
 | --- | --- |
-| `LiquidGlass` | The material itself: config plus the layered painter. |
-| `GlassBackdrop` | A small blurred bitmap of what sits behind the glass, sampled per control. |
-| `GlassSurfaceView` | Base view: sampling, press spring, outline and shadow. |
-| `LiquidGlassCircleButton` | The big round button from the reference. |
-| `LiquidGlassIconButton` | Any-size glass button with a configurable corner radius. |
-| `LiquidGlassPillButton` | Wide pill: nested glass disc, label, chevron. |
-| `LiquidGlassPanel` | A glass container for arbitrary content. |
-| `LiquidGlassFloatingToolbar` | A floating glass bar of icon actions. |
-| `LiquidGlassBottomNavigation` | Glass bar with an animated selection pill. |
-| `LiquidGlassDialog` | Floating glass dialog with a scale/fade entrance. |
+| `Palette` | The eight themes, six accents and every derived role (surface, container, border, key states). |
+| `Surfaces` | Opaque drawables: page background, card, inset field, pill with a ripple, bottom sheet. |
+| `M3` | Settings widgets: large-title header, cards, tiles, chips, segmented control, filled/tonal buttons, switch rows, nav rows. |
+| `M3Switch` | Hand-drawn switch: solid track, white thumb with a short soft shadow. |
+| `AppDialog` | Solid rounded dialog, dimmed backdrop, scale/fade entrance. |
+| `KeyboardView` | Canvas keyboard: opaque key caps, shadows, press wave, sheen, previews. |
 
-How the glass is built, in draw order: the backdrop fragment (magnified 1.06 –
-1.10x around the centre as a cheap lens), a white wash, an accent tint, four
-soft cyan/blue/violet/pink reflections, a top gloss sheet, a seven-ring inner
-halo that reads as one smooth glow, and a diagonal specular hairline. Rainbows
-are not faked: the reflections are tinted by the palette, on top of whatever
-the photo already contributes.
-
-**Blur, honestly.** Android cannot blur the siblings behind an arbitrary View;
-`RenderEffect` only affects the node it is attached to. So the system keeps a
-downscaled bitmap of the real background (the wallpaper, or a capture of a
-background view through `GlassBackdrop.capture`) and box-blurs it once in
-software, never per frame. Each pane then samples the fragment underneath
-itself, which is why moving a control over the photo shows the correct part of
-the photo inside it. `Window.setBackgroundBlurRadius` is used for the dialog on
-Android 12+ where the device supports cross-window blur, with an ordinary
-translucent window everywhere else.
-
-Motion: press springs to 94.5% and settles with an overshoot, the bottom bar's
-selection pill slides, toolbars fade and lift in, the dialog scales up. All of
-it is switched off when the system animation scale is zero.
-
-Every surface uses this material now: all eight settings screens (cards, the
-floating top bar, tiles, chips, segmented controls, buttons and text fields),
-the confirmation and guide dialogs, and the keyboard's clipboard, translate,
-more and voice panels. The blurred backdrop is captured once per window and
-size and reused, so scrolling a screen full of glass costs one bitmap sample
-per pane. The standalone showcase opens from Settings → Liquid glass demo
-(also linked in About).
+Motion is small and honest: buttons squash to 97% on touch, keys spring and
+ripple, screens slide sideways, dialogs scale in. Everything is switched off
+when the system animation scale is zero, and every interactive control keeps a
+48 dp touch target and a content description.
 
 ## Changes
+
+**2.0**
+
+- Liquid glass removed completely: no transparency, no backdrop sampling, no
+  blur and no wallpaper behind the UI. The glass engine, its components, the
+  showcase screen and the wallpaper reader were deleted.
+- New solid design system: opaque tonal surfaces with hairline outlines, large
+  page titles, accent-filled chips, segments and primary buttons, tonal icon
+  badges and inset fields.
+- All eight settings screens, every dialog and the keyboard's clipboard,
+  translate, more and voice sheets rebuilt on the new surfaces.
+- Keyboard keys are opaque caps with a pressed colour, soft shadow and
+  hairline outline; the press wave, sheen and previews stay.
+- Settings stay edge to edge with transparent system bars.
 
 **1.21**
 

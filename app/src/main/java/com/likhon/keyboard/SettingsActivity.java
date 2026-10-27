@@ -162,7 +162,7 @@ public class SettingsActivity extends Activity {
         if (store.size() == 0) {
             return;
         }
-        LiquidGlassDialog.show(this, palette, getString(R.string.settings_clipboard),
+        AppDialog.show(this, palette, getString(R.string.settings_clipboard),
                 getString(R.string.clip_clear_confirm, store.size()),
                 getString(R.string.clip_clear), () -> {
                     store.clear();
@@ -240,7 +240,7 @@ public class SettingsActivity extends Activity {
         field.setHint(hint);
         field.setSingleLine(true);
         field.setInputType(InputType.TYPE_CLASS_TEXT);
-        field.setBackground(Glass.glass(this, palette, 16, 0));
+        field.setBackground(Surfaces.inset(this, palette, 14));
         field.setPadding(dp(12), dp(10), dp(12), dp(10));
         return field;
     }
@@ -359,7 +359,7 @@ public class SettingsActivity extends Activity {
     }
 
     private void confirmClearLearned() {
-        LiquidGlassDialog.show(this, palette, getString(R.string.section_learned),
+        AppDialog.show(this, palette, getString(R.string.section_learned),
                 getString(R.string.learned_clear_confirm),
                 getString(R.string.learned_clear), () -> {
                     new LearnedWords(this).clear();
@@ -369,7 +369,7 @@ public class SettingsActivity extends Activity {
     }
 
     private void confirmResetAll() {
-        LiquidGlassDialog.show(this, palette, getString(R.string.reset_all),
+        AppDialog.show(this, palette, getString(R.string.reset_all),
                 getString(R.string.reset_all_confirm),
                 getString(R.string.reset_all), () -> {
                     prefs.raw().edit().clear().apply();
@@ -592,10 +592,6 @@ public class SettingsActivity extends Activity {
                 getString(R.string.home_keyboard), getString(R.string.home_keyboard_sub),
                 this::openKeyboardSettings));
         more.addView(M3.divider(this, palette));
-        more.addView(M3.navRow(this, palette, R.drawable.ic_droplet,
-                getString(R.string.demo_open), getString(R.string.demo_open_sub),
-                () -> startActivity(new Intent(this, GlassDemoActivity.class))));
-        more.addView(M3.divider(this, palette));
         more.addView(M3.navRow(this, palette, R.drawable.ic_settings,
                 getString(R.string.section_about), getString(R.string.about_short),
                 () -> open(SCREEN_ABOUT)));
@@ -617,7 +613,7 @@ public class SettingsActivity extends Activity {
         field.setMinHeight(dp(58));
         field.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
                 | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-        field.setBackground(Glass.glass(this, palette, 16, 0));
+        field.setBackground(Surfaces.inset(this, palette, 14));
         field.setPadding(dp(14), dp(12), dp(14), dp(12));
         LinearLayout.LayoutParams fieldParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -974,10 +970,6 @@ public class SettingsActivity extends Activity {
         links.addView(M3.navRow(this, palette, R.drawable.ic_keyboard,
                 getString(R.string.home_keyboard), getString(R.string.home_keyboard_sub),
                 this::openKeyboardSettings));
-        links.addView(M3.divider(this, palette));
-        links.addView(M3.navRow(this, palette, R.drawable.ic_droplet,
-                getString(R.string.demo_open), getString(R.string.demo_open_sub),
-                () -> startActivity(new Intent(this, GlassDemoActivity.class))));
         addCard(body, links);
 
         return subScreen(R.string.screen_about, R.string.screen_about_desc, body);
@@ -1042,14 +1034,14 @@ public class SettingsActivity extends Activity {
 
             LinearLayout chip = Ui.horizontal(this);
             chip.setPadding(dp(7), dp(10), dp(9), dp(10));
-            LiquidGlassDrawable base = (LiquidGlassDrawable) Glass.fill(this, palette, 18, 0);
+            GradientDrawable base = Surfaces.surface(this, palette, 18);
             if (selected) {
-                base.setEdge(palette.accent, 2f);
+                base.setStroke(dp(2), palette.accent);
             }
             chip.setBackground(new android.graphics.drawable.RippleDrawable(
                     android.content.res.ColorStateList.valueOf(0x1A000000), base,
                     Ui.rounded(this, 0xFFFFFFFF, 18)));
-            chip.setElevation(dp(selected ? 3 : 1));
+            chip.setElevation(dp(selected ? 2 : 0));
 
             View swatch = new View(this);
             GradientDrawable swatchBg = new GradientDrawable(
@@ -1580,7 +1572,7 @@ public class SettingsActivity extends Activity {
         }
         refreshVoiceStatus();
         if (grantResults.length > 0 && grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-            LiquidGlassDialog.show(this, palette,
+            AppDialog.show(this, palette,
                     getString(R.string.voice_permission_denied),
                     getString(R.string.voice_permission_denied_body));
         }
@@ -1663,7 +1655,7 @@ public class SettingsActivity extends Activity {
     }
 
     private void showGuide() {
-        LiquidGlassDialog.show(this, palette, getString(R.string.guide_title),
+        AppDialog.show(this, palette, getString(R.string.guide_title),
                 getString(R.string.guide_body));
     }
 
@@ -1716,8 +1708,8 @@ public class SettingsActivity extends Activity {
                 selected ? palette.success : enabled ? palette.accent : palette.textMuted, 5));
         enableButton.setText(enabled ? R.string.action_settings : R.string.action_enable);
         chooseButton.setText(selected ? R.string.action_change : R.string.action_choose);
-        chooseButton.setBackground(Glass.control(this, palette, 22, palette.accent,
-                0x33FFFFFF));
+        chooseButton.setBackground(Surfaces.control(this, palette, 22, palette.accent,
+                0, 0x33FFFFFF));
         chooseButton.setTextColor(palette.onAccent);
 
         if (chipEnglish != null) {

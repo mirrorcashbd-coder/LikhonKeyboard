@@ -45,7 +45,7 @@
 
     <string name="section_about">সম্পর্কে</string>
     <string name="about_body">লিখন একটি ছোট, অফলাইন কীবোর্ড। এতে বিজ্ঞাপন নেই এবং কোথাও কিছু পাঠায় না; মাইক্রোফোন কেবল ভয়েস টাইপিংয়ে ব্যবহার হয়। ইংরেজি সাধারণ QWERTY লেআউট; বাংলা ফোনেটিক, অর্থাৎ ইংরেজি অক্ষরে যেভাবে উচ্চারণ হয় সেভাবে লিখলেই বাংলা হয়।</string>
-    <string name="about_version">সংস্করণ ১.২১</string>
+    <string name="about_version">সংস্করণ ২.০</string>
     <string name="footer">অফলাইন · বিজ্ঞাপন নেই · মাইক অনুমতি ঐচ্ছিক</string>
     <string name="about_guide">বাংলা টাইপিং নির্দেশিকা</string>
 
@@ -245,7 +245,7 @@
     <string name="theme_glacier">গ্লেসিয়ার</string>
     <string name="theme_neon">নিয়ন</string>
     <string name="theme_graphite">গ্রাফাইট</string>
-    <string name="hero_version">v১.২১</string>
+    <string name="hero_version">v২.০</string>
     <string name="key_gap">কী-এর ফাঁক</string>
     <string name="gap_compact">ঘন</string>
     <string name="gap_normal">স্বাভাবিক</string>
@@ -289,21 +289,4 @@
     <string name="action_back">ফিরে যান</string>
     <string name="dialog_cancel">বাতিল</string>
     <string name="dialog_ok">ঠিক আছে</string>
-    <string name="demo_title">লিকুইড গ্লাস</string>
-    <string name="demo_subtitle">নেটিভ কাচ, সত্যিকারের ব্লার, জীবন্ত আলো</string>
-    <string name="demo_focus">ফোকাস</string>
-    <string name="demo_lock">রোটেশন লক</string>
-    <string name="demo_screens">স্ক্রিন</string>
-    <string name="demo_bell">নোটিফিকেশন</string>
-    <string name="demo_grid">অ্যাপ গ্রিড</string>
-    <string name="demo_dialog_title">লিকুইড গ্লাস ডায়ালগ</string>
-    <string name="demo_dialog_message">প্রতিটি কন্ট্রোল হাতে আঁকা: পেছনের ব্লার করা ছবি, সায়ান ও ভায়োলেট প্রতিচ্ছবি, ভেতরের হ্যালো আর কাচের কিনারার আলো।</string>
-    <string name="demo_settings">সেটিংস</string>
-    <string name="demo_nav_keys">কী</string>
-    <string name="demo_nav_language">ভাষা</string>
-    <string name="demo_nav_voice">ভয়েস</string>
-    <string name="demo_nav_style">স্টাইল</string>
-    <string name="demo_nav_about">সম্পর্কে</string>
-    <string name="demo_open">লিকুইড গ্লাস ডেমো</string>
-    <string name="demo_open_sub">গোল বাটন, পিল কন্ট্রোল আর ফ্লোটিং বার</string>
 </resources>

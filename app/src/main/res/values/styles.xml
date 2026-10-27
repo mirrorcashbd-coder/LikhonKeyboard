@@ -25,16 +25,4 @@
         <item name="android:colorControlActivated">@color/theme_dark_accent</item>
     </style>
 
-    <style name="Theme.Likhon.Dialog.Light" parent="@android:style/Theme.Material.Light.Dialog.Alert">
-        <item name="android:colorAccent">@color/theme_light_accent</item>
-        <item name="android:windowBackground">@color/theme_light_surface</item>
-        <item name="android:textColorPrimary">@color/theme_light_text</item>
-    </style>
-
-    <style name="Theme.Likhon.Dialog.Dark" parent="@android:style/Theme.Material.Dialog.Alert">
-        <item name="android:colorAccent">@color/theme_dark_accent</item>
-        <item name="android:windowBackground">@color/theme_dark_surface</item>
-        <item name="android:textColorPrimary">@color/theme_dark_text</item>
-    </style>
-
 </resources>

@@ -86,18 +86,17 @@ final class M3Switch extends View {
         float h = getHeight();
         float radius = h / 2f;
 
-        // translucent glass track
-        int offTrack = (palette.dark ? 0x2A : 0x1F) << 24
-                | (palette.text & 0x00FFFFFF);
+        // solid track: quiet grey when off, accent when on
+        int off = Palette.mix(palette.surface, palette.text, palette.dark ? 0.22f : 0.17f);
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Palette.mix(offTrack, palette.accent, progress));
+        paint.setColor(Palette.mix(off, palette.accent, progress));
         rect.set(0, 0, w, h);
         canvas.drawRoundRect(rect, radius, radius, paint);
 
-        // specular rim
+        // hairline that follows the fill
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(dp(1.1f));
-        paint.setColor((palette.dark ? 0x66 : 0x88) << 24 | 0x00FFFFFF);
+        paint.setStrokeWidth(dp(1f));
+        paint.setColor(Palette.mix(Surfaces.border(palette), palette.accentPressed, progress));
         rect.set(dp(0.5f), dp(0.5f), w - dp(0.5f), h - dp(0.5f));
         canvas.drawRoundRect(rect, radius, radius, paint);
         paint.setStyle(Paint.Style.FILL);
@@ -106,21 +105,17 @@ final class M3Switch extends View {
         float travel = w - thumb - dp(5);
         float left = dp(2.5f) + travel * progress;
         float cy = h / 2f;
+        float cx = left + thumb / 2f;
 
-        // floating thumb: shadow, then a clear white bead with a bright rim
-        paint.setColor(0x40000000);
-        canvas.drawCircle(left + thumb / 2f, cy + dp(1.6f), thumb / 2f, paint);
+        // floating thumb with a short, soft shadow
+        paint.setColor(0x33000000);
+        canvas.drawCircle(cx, cy + dp(1.4f), thumb / 2f, paint);
         paint.setColor(0xFFFFFFFF);
-        canvas.drawCircle(left + thumb / 2f, cy, thumb / 2f, paint);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(dp(0.8f));
-        paint.setColor(0x66FFFFFF);
-        canvas.drawCircle(left + thumb / 2f, cy, thumb / 2f - dp(0.4f), paint);
-        paint.setStyle(Paint.Style.FILL);
+        canvas.drawCircle(cx, cy, thumb / 2f, paint);
 
         if (isPressed()) {
             paint.setColor((palette.accent & 0x00FFFFFF) | 0x22000000);
-            canvas.drawCircle(left + thumb / 2f, cy, thumb * 0.78f, paint);
+            canvas.drawCircle(cx, cy, thumb * 0.78f, paint);
         }
     }
 

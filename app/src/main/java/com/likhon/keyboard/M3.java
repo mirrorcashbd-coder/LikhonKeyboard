@@ -4,7 +4,6 @@ import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
-import android.graphics.drawable.LayerDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -16,10 +15,12 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 /**
- * Settings building blocks in an iOS 27 liquid-glass language: translucent
- * glass panels, specular rims, floating pills and a soft colour mesh behind
- * everything. All colours still come from {@link Palette}, so the eight themes
- * and every accent keep working.
+ * Settings building blocks in a solid, modern Material 3 language: opaque
+ * cards with hairline outlines, tonal icon containers, large page titles,
+ * pill chips and segmented controls that fill with the accent when selected.
+ *
+ * <p>Every colour comes from {@link Palette}, so the eight themes and the six
+ * accent choices keep working without a separate stylesheet.
  */
 final class M3 {
 
@@ -46,7 +47,7 @@ final class M3 {
     }
 
     static int outlineVariant(Palette p) {
-        return Palette.mix(p.surface, p.text, 0.10f);
+        return Surfaces.border(p);
     }
 
     static int outline(Palette p) {
@@ -54,11 +55,11 @@ final class M3 {
     }
 
     static int primaryContainer(Palette p) {
-        return Palette.mix(p.surface, p.accent, p.dark ? 0.24f : 0.13f);
+        return Surfaces.container(p);
     }
 
     static int onPrimaryContainer(Palette p) {
-        return Palette.mix(p.text, p.accent, p.dark ? 0.45f : 0.4f);
+        return Palette.mix(p.text, p.accent, p.dark ? 0.35f : 0.42f);
     }
 
     // ------------------------------------------------------------- primitives
@@ -106,17 +107,14 @@ final class M3 {
 
     static FrameLayout screen(Context c, Palette p, View bar, LinearLayout body) {
         FrameLayout screen = new FrameLayout(c);
-        screen.addView(new Glass.Backdrop(c, p), new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        screen.setBackground(Surfaces.background(c, p));
 
         LinearLayout column = Ui.vertical(c);
         LinearLayout barWrap = Ui.vertical(c);
-        barWrap.setPadding(dp(c, 12), dp(c, 10), dp(c, 12), dp(c, 6));
-        // The wallpaper runs under the status bar, so the top bar moves down
-        // by exactly the inset instead of being covered by the clock.
+        barWrap.setPadding(dp(c, 16), dp(c, 8), dp(c, 16), dp(c, 8));
         barWrap.setOnApplyWindowInsetsListener((v, insets) -> {
-            v.setPadding(dp(c, 12), dp(c, 10) + insets.getSystemWindowInsetTop(),
-                    dp(c, 12), dp(c, 6));
+            v.setPadding(dp(c, 16), dp(c, 8) + insets.getSystemWindowInsetTop(),
+                    dp(c, 16), dp(c, 8));
             return insets;
         });
         barWrap.addView(bar);
@@ -144,27 +142,31 @@ final class M3 {
 
     static LinearLayout body(Context c) {
         LinearLayout body = Ui.vertical(c);
-        body.setPadding(dp(c, 14), dp(c, 2), dp(c, 14), dp(c, 48));
+        body.setPadding(dp(c, 16), dp(c, 2), dp(c, 16), dp(c, 40));
         return body;
     }
 
+    /**
+     * Large-title header: an app mark (home) or a tonal back circle (sub
+     * screens), the page title and a one line description.
+     */
     static LinearLayout topBar(Context c, Palette p, CharSequence title, CharSequence subtitle,
                                Runnable back, boolean showAppIcon) {
-        LinearLayout bar = new Glass.Panel(c, p, 26, Glass.BAR, true);
-        bar.setPadding(dp(c, 10), dp(c, 9), dp(c, 16), dp(c, 9));
-        bar.setElevation(dp(c, 4));
+        LinearLayout bar = Ui.horizontal(c);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(0, dp(c, 6), 0, dp(c, 8));
 
         if (showAppIcon) {
             ImageView app = new ImageView(c);
             app.setImageResource(R.mipmap.ic_launcher);
             LinearLayout.LayoutParams appParams = new LinearLayout.LayoutParams(
-                    dp(c, 42), dp(c, 42));
-            appParams.rightMargin = dp(c, 12);
+                    dp(c, 46), dp(c, 46));
+            appParams.rightMargin = dp(c, 14);
             bar.addView(app, appParams);
         } else if (back != null) {
             FrameLayout btn = new FrameLayout(c);
-            btn.setBackground(Glass.control(c, p, 21, 0,
-                    (p.text & 0x00FFFFFF) | 0x14000000));
+            btn.setBackground(Surfaces.control(c, p, 21, Surfaces.muted(p),
+                    Surfaces.border(p), (p.text & 0x00FFFFFF) | 0x1A000000));
             btn.addView(icon(c, R.drawable.ic_back, p.text),
                     new FrameLayout.LayoutParams(dp(c, 20), dp(c, 20), Gravity.CENTER));
             btn.setClickable(true);
@@ -172,62 +174,63 @@ final class M3 {
             btn.setOnClickListener(v -> back.run());
             pressScale(btn);
             LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
-                    dp(c, 40), dp(c, 40));
-            btnParams.rightMargin = dp(c, 12);
+                    dp(c, 42), dp(c, 42));
+            btnParams.rightMargin = dp(c, 14);
             bar.addView(btn, btnParams);
         }
 
         LinearLayout texts = Ui.vertical(c);
-        texts.addView(Ui.text(c, title, 19, p.text, true));
+        TextView titleView = Ui.text(c, title, 21, p.text, true);
+        titleView.setLetterSpacing(-0.015f);
+        texts.addView(titleView);
         if (subtitle != null && subtitle.length() > 0) {
-            TextView sub = Ui.text(c, subtitle, 11, p.textMuted, false);
+            TextView sub = Ui.text(c, subtitle, 12, p.textMuted, false);
             sub.setPadding(0, dp(c, 2), 0, 0);
             texts.addView(sub);
         }
         bar.addView(texts, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        bar.setGravity(Gravity.CENTER_VERTICAL);
         return bar;
     }
 
     // ------------------------------------------------------------- containers
 
     static LinearLayout card(Context c, Palette p) {
-        LinearLayout card = new Glass.Panel(c, p, 28, Glass.CARD, false);
-        card.setElevation(dp(c, 5));
+        LinearLayout card = Ui.vertical(c);
+        card.setBackground(Surfaces.surface(c, p, 22));
         card.setClipToPadding(false);
-        int pad = dp(c, 18);
+        int pad = dp(c, 16);
         card.setPadding(pad, pad, pad, pad);
         return card;
     }
 
     static LinearLayout bareCard(Context c, Palette p) {
-        LinearLayout card = new Glass.Panel(c, p, 28, Glass.CARD, false);
-        card.setElevation(dp(c, 5));
+        LinearLayout card = Ui.vertical(c);
+        card.setBackground(Surfaces.surface(c, p, 22));
         card.setClipToPadding(false);
         return card;
     }
 
     static void applySurface(Context c, View view, Palette p, float radiusDp,
                              float elevationDp) {
-        view.setBackground(Glass.glass(c, p, radiusDp, 0));
+        view.setBackground(Surfaces.surface(c, p, radiusDp));
         view.setElevation(dp(c, elevationDp));
     }
 
     static TextView sectionLabel(Context c, Palette p, CharSequence text) {
-        TextView label = Ui.text(c, text, 12, p.textMuted, true);
-        label.setShadowLayer(dp(c, 3f), 0, dp(c, 1f),
-                p.dark ? 0x99000000 : 0x88FFFFFF);
-        label.setLetterSpacing(0.09f);
+        TextView label = Ui.text(c, text, 11.5f, p.textMuted, true);
+        label.setLetterSpacing(0.085f);
         label.setAllCaps(false);
-        label.setPadding(dp(c, 8), dp(c, 22), 0, dp(c, 8));
+        label.setPadding(dp(c, 6), dp(c, 24), 0, dp(c, 8));
         return label;
     }
 
     static View divider(Context c, Palette p) {
         View view = new View(c);
-        view.setBackgroundColor((p.text & 0x00FFFFFF) | 0x14000000);
+        view.setBackgroundColor(Surfaces.border(p));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, Math.max(1, dp(c, 0.7f)));
+                LinearLayout.LayoutParams.MATCH_PARENT, Math.max(1, dp(c, 1f)));
         view.setLayoutParams(params);
         return view;
     }
@@ -239,7 +242,7 @@ final class M3 {
         TextView chip = Ui.text(c, label, 13, selected ? p.onAccent : p.text, true);
         chip.setGravity(Gravity.CENTER);
         chip.setSingleLine(true);
-        chip.setPadding(dp(c, 12), dp(c, 11), dp(c, 12), dp(c, 11));
+        chip.setPadding(dp(c, 14), dp(c, 10), dp(c, 14), dp(c, 10));
         applyChip(chip, c, p, selected);
         chip.setClickable(true);
         chip.setFocusable(true);
@@ -249,52 +252,43 @@ final class M3 {
 
     static void applyChip(TextView chip, Context c, Palette p, boolean selected) {
         chip.setTextColor(selected ? p.onAccent : p.text);
-        int ripple = selected ? 0x33FFFFFF : ((p.text & 0x00FFFFFF) | 0x18000000);
         if (selected) {
-            chip.setBackground(Glass.control(c, p, 18, p.accent, ripple));
-            chip.setElevation(dp(c, 2));
+            chip.setBackground(Surfaces.control(c, p, 19, p.accent, 0, 0x33FFFFFF));
         } else {
-            chip.setBackground(Glass.control(c, p, 18, 0, ripple));
-            chip.setElevation(0);
+            chip.setBackground(Surfaces.control(c, p, 19, p.surface, Surfaces.border(p),
+                    (p.text & 0x00FFFFFF) | 0x14000000));
         }
-    }
-
-    /** Brighter glass pill used for the selected segment. */
-    private static Drawable raisedPill(Context c, Palette p, float radiusDp) {
-        return new LiquidGlassDrawable(c, p, radiusDp, 0x00FFFFFF,
-                p.dark ? 0.18f : 0.38f);
+        chip.setElevation(0);
     }
 
     static LinearLayout segmented(Context c, Palette p, CharSequence[] labels, int selected,
                                   final IntAction action) {
         LinearLayout track = Ui.horizontal(c);
-        track.setBackground(Glass.control(c, p, 24, 0,
-                (p.text & 0x00FFFFFF) | 0x08000000));
+        track.setBackground(Surfaces.inset(c, p, 20));
         track.setPadding(dp(c, 4), dp(c, 4), dp(c, 4), dp(c, 4));
 
         for (int i = 0; i < labels.length; i++) {
             final int index = i;
             final boolean on = i == selected;
             TextView segment = Ui.text(c, labels[i], 13,
-                    on ? p.text : p.textMuted, true);
+                    on ? p.onAccent : p.textMuted, true);
             segment.setGravity(Gravity.CENTER);
             segment.setSingleLine(true);
             segment.setPadding(dp(c, 6), dp(c, 10), dp(c, 6), dp(c, 10));
             if (on) {
-                segment.setBackground(raisedPill(c, p, 20));
-                segment.setElevation(dp(c, 3));
+                segment.setBackground(Surfaces.rounded(c, p.accent, 16, 0));
+                segment.setElevation(dp(c, 1));
             } else {
                 segment.setClickable(true);
                 segment.setFocusable(true);
-                segment.setBackground(new RippleDrawable(
-                        ColorStateList.valueOf((p.text & 0x00FFFFFF) | 0x14000000),
-                        Ui.rounded(c, 0x00000000, 20), mask(c, 20)));
+                segment.setBackground(Surfaces.ripple(c, 16,
+                        (p.text & 0x00FFFFFF) | 0x14000000));
                 segment.setOnClickListener(v -> action.run(index));
             }
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
             if (i > 0) {
-                params.leftMargin = dp(c, 4);
+                params.leftMargin = dp(c, 3);
             }
             track.addView(segment, params);
         }
@@ -307,8 +301,7 @@ final class M3 {
         TextView button = Ui.text(c, label, 14, p.onAccent, true);
         button.setGravity(Gravity.CENTER);
         button.setPadding(dp(c, 18), dp(c, 12), dp(c, 18), dp(c, 12));
-        button.setBackground(Glass.control(c, p, 22, p.accent, 0x33FFFFFF));
-        button.setElevation(dp(c, 3));
+        button.setBackground(Surfaces.control(c, p, 20, p.accent, 0, 0x33FFFFFF));
         button.setClickable(true);
         button.setFocusable(true);
         button.setOnClickListener(v -> action.run());
@@ -320,9 +313,8 @@ final class M3 {
         TextView button = Ui.text(c, label, 14, onPrimaryContainer(p), true);
         button.setGravity(Gravity.CENTER);
         button.setPadding(dp(c, 18), dp(c, 12), dp(c, 18), dp(c, 12));
-        button.setBackground(Glass.control(c, p, 22, 0,
+        button.setBackground(Surfaces.control(c, p, 20, primaryContainer(p), 0,
                 (p.accent & 0x00FFFFFF) | 0x24000000));
-        button.setElevation(dp(c, 1));
         button.setClickable(true);
         button.setFocusable(true);
         button.setOnClickListener(v -> action.run());
@@ -362,14 +354,13 @@ final class M3 {
 
     static View tile(Context c, Palette p, int iconRes, CharSequence title,
                      CharSequence subtitle, Runnable action) {
-        Glass.Tile tile = new Glass.Tile(c, p, 24, Glass.CARD);
-        tile.setElevation(dp(c, 4));
+        FrameLayout tile = new FrameLayout(c);
+        tile.setBackground(Surfaces.surface(c, p, 20));
         tile.setPadding(dp(c, 14), dp(c, 14), dp(c, 14), dp(c, 14));
 
         LinearLayout content = Ui.vertical(c);
         FrameLayout badge = new FrameLayout(c);
-        badge.setBackground(Glass.glass(c, p, 20, 0));
-        badge.setElevation(dp(c, 1));
+        badge.setBackground(Surfaces.rounded(c, primaryContainer(p), 13, 0));
         badge.addView(icon(c, iconRes, p.accent),
                 new FrameLayout.LayoutParams(dp(c, 21), dp(c, 21), Gravity.CENTER));
         content.addView(badge, new LinearLayout.LayoutParams(dp(c, 40), dp(c, 40)));
@@ -391,7 +382,7 @@ final class M3 {
 
         tile.setClickable(true);
         tile.setFocusable(true);
-        tile.setForeground(rippleMask(c, (p.text & 0x00FFFFFF) | 0x18000000, 24));
+        tile.setForeground(rippleMask(c, (p.text & 0x00FFFFFF) | 0x18000000, 20));
         tile.setOnClickListener(v -> action.run());
         pressScale(tile);
         return tile;
@@ -400,10 +391,10 @@ final class M3 {
     static View navRow(Context c, Palette p, int iconRes, CharSequence title,
                        CharSequence subtitle, Runnable action) {
         LinearLayout row = Ui.horizontal(c);
-        row.setPadding(dp(c, 12), dp(c, 12), dp(c, 10), dp(c, 12));
+        row.setPadding(dp(c, 8), dp(c, 10), dp(c, 6), dp(c, 10));
 
         FrameLayout badge = new FrameLayout(c);
-        badge.setBackground(Glass.glass(c, p, 17, 0));
+        badge.setBackground(Surfaces.rounded(c, primaryContainer(p), 17, 0));
         badge.addView(icon(c, iconRes, p.accent),
                 new FrameLayout.LayoutParams(dp(c, 19), dp(c, 19), Gravity.CENTER));
         LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(
@@ -423,9 +414,7 @@ final class M3 {
         row.addView(icon(c, R.drawable.ic_chevron, p.textMuted),
                 new LinearLayout.LayoutParams(dp(c, 17), dp(c, 17)));
 
-        row.setBackground(new RippleDrawable(
-                ColorStateList.valueOf((p.text & 0x00FFFFFF) | 0x16000000),
-                Ui.rounded(c, 0x00000000, 16), mask(c, 16)));
+        row.setBackground(Surfaces.ripple(c, 16, (p.text & 0x00FFFFFF) | 0x16000000));
         row.setClickable(true);
         row.setFocusable(true);
         row.setOnClickListener(v -> action.run());

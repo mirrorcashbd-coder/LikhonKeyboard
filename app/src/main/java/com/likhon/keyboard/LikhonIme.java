@@ -90,10 +90,6 @@ public class LikhonIme extends InputMethodService
     private ImageView undoView;
     private ImageView redoView;
     private LinearLayout panelHost;
-    private GlassBackdrop glassBackdrop;
-    private int glassBackdropW;
-    private int glassBackdropH;
-    private Palette glassBackdropPalette;
     private LinearLayout clipPanel;
     private LinearLayout clipList;
     private TextView clipCount;
@@ -193,9 +189,6 @@ public class LikhonIme extends InputMethodService
 
         LinearLayout root = new LinearLayout(this);
         rootView = root;
-        root.addOnLayoutChangeListener((v, left, top, right, bottom,
-                                        oldLeft, oldTop, oldRight, oldBottom) ->
-                publishGlassBackdrop());
         root.setOrientation(LinearLayout.VERTICAL);
         suggestions = new Suggestions(this);
         learned = new LearnedWords(this);
@@ -562,8 +555,7 @@ public class LikhonIme extends InputMethodService
                 : (prefs.labelSize() == 2 ? 1.09f : 1f));
         styleVoicePanel();
         if (rootView != null) {
-            rootView.setBackground(new Glass.BackdropDrawable(this, palette));
-            rootView.post(this::publishGlassBackdrop);
+            rootView.setBackground(Surfaces.background(this, palette));
         }
         if (resizeHandle != null) {
             resizeHandle.setBackgroundColor(Color.TRANSPARENT);
@@ -572,8 +564,7 @@ public class LikhonIme extends InputMethodService
             toolBar.setBackgroundColor(Color.TRANSPARENT);
         }
         if (gripView != null) {
-            gripView.setBackground(Ui.rounded(this,
-                    ((palette.dark ? 0x3A : 0x66) << 24) | 0x00FFFFFF, 2));
+            gripView.setBackground(Ui.rounded(this, Surfaces.border(palette), 2));
         }
         if (voiceLevel != null) {
             voiceLevel.setBackground(Ui.rounded(this, palette.accent, 2));
@@ -582,47 +573,15 @@ public class LikhonIme extends InputMethodService
             styleToolBar();
         }
         if (toolDivider != null) {
-            toolDivider.setBackgroundColor(
-                    ((palette.dark ? 0x1E : 0x2A) << 24) | 0x00FFFFFF);
+            toolDivider.setBackgroundColor(Surfaces.border(palette));
         }
         if (panelHost != null) {
-            panelHost.setBackground(Glass.glass(this, palette, 22, 0));
+            panelHost.setBackground(Surfaces.sheet(this, palette, 20));
             panelHost.setPadding(dp(2), dp(2), dp(2), dp(2));
         }
         if (candidateScroll != null && !prefs.suggestionsEnabled()) {
             candidateScroll.setVisibility(View.GONE);
         }
-    }
-
-    /**
-     * Captures the keyboard's own backdrop (wallpaper + wash + blobs) once per
-     * size and palette, so glass panels inside the IME sample the real pixels
-     * under them instead of a flat tint.
-     */
-    private void publishGlassBackdrop() {
-        if (rootView == null || palette == null) {
-            return;
-        }
-        int w = rootView.getWidth();
-        int h = rootView.getHeight();
-        if (w <= 0 || h <= 0) {
-            return;
-        }
-        if (glassBackdrop != null && glassBackdropW == w && glassBackdropH == h
-                && glassBackdropPalette == palette) {
-            return;
-        }
-        GlassBackdrop backdrop = Glass.capture(rootView,
-                new Glass.BackdropPainter(this, palette));
-        if (backdrop == null) {
-            return;
-        }
-        Glass.publish(rootView, backdrop);
-        rootView.invalidate();
-        glassBackdrop = backdrop;
-        glassBackdropW = w;
-        glassBackdropH = h;
-        glassBackdropPalette = palette;
     }
 
     // ------------------------------------------------------------- the layout
@@ -1578,8 +1537,8 @@ public class LikhonIme extends InputMethodService
     private TextView panelButton(String label, Runnable action) {
         TextView view = Ui.text(this, label, 12, palette.text, true);
         view.setPadding(dp(10), dp(6), dp(10), dp(6));
-        view.setBackground(Glass.control(this, palette, 9, 0,
-                (palette.accent & 0x00FFFFFF) | 0x2A000000));
+        view.setBackground(Surfaces.control(this, palette, 10, Surfaces.muted(palette),
+                Surfaces.border(palette), (palette.accent & 0x00FFFFFF) | 0x24000000));
         view.setClickable(true);
         view.setOnClickListener(v -> action.run());
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
@@ -1642,8 +1601,8 @@ public class LikhonIme extends InputMethodService
             text.setSingleLine(true);
             text.setEllipsize(TextUtils.TruncateAt.END);
             text.setPadding(dp(2), dp(9), dp(10), dp(9));
-            text.setBackground(Glass.control(this, palette, 9, 0,
-                    (palette.accent & 0x00FFFFFF) | 0x2A000000));
+            text.setBackground(Surfaces.control(this, palette, 10, Surfaces.muted(palette),
+                    0, (palette.accent & 0x00FFFFFF) | 0x24000000));
             text.setLayoutParams(new LinearLayout.LayoutParams(
                     0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
             text.setOnClickListener(v -> {
@@ -2130,7 +2089,7 @@ public class LikhonIme extends InputMethodService
         if (voicePanel == null || palette == null) {
             return;
         }
-        voicePanel.setBackground(Glass.glass(this, palette, 22, 0));
+        voicePanel.setBackground(Surfaces.sheet(this, palette, 20));
         voiceStatus.setTextColor(palette.text);
         voiceMode.setTextColor(palette.onAccent);
         voiceMode.setBackground(Ui.rounded(this, palette.accent, 10));
@@ -2474,10 +2433,10 @@ public class LikhonIme extends InputMethodService
             chip.setTextColor(first ? palette.accent : palette.text);
             chip.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
             chip.setPadding(dp(12), dp(7), dp(12), dp(7));
-            int chipFill = first
-                    ? ((palette.dark ? 0x3C : 0x40) << 24) | (palette.accent & 0x00FFFFFF)
-                    : ((palette.dark ? 0x1C : 0x8A) << 24) | 0x00FFFFFF;
-            chip.setBackground(Ui.ripple(this, chipFill, 11, palette.accent));
+            int chipFill = first ? Surfaces.container(palette) : palette.surface;
+            chip.setBackground(Surfaces.control(this, palette, 11, chipFill,
+                    first ? 0 : Surfaces.border(palette),
+                    (palette.accent & 0x00FFFFFF) | 0x22000000));
             chip.setOnClickListener(v -> pickSuggestion(word));
             chip.setOnLongClickListener(v -> {
                 if (learned.remove(word)) {

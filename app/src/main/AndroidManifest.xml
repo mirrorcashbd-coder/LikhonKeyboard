@@ -39,11 +39,6 @@
         </activity>
 
         <!-- The liquid-glass showcase, opened from Settings → About. -->
-        <activity
-            android:name=".GlassDemoActivity"
-            android:exported="false"
-            android:label="@string/demo_title"
-            android:theme="@style/Theme.Likhon.Light" />
 
         <!-- Invisible hop to the phone's speech screen; see VoiceScreenActivity. -->
         <activity
