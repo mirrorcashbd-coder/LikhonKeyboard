@@ -470,7 +470,7 @@ final class VoiceInput implements RecognitionListener {
             engineMisses++;
             // An engine that never reports a voice or even a sound level is
             // not receiving audio at all (some phones bind a stub): move on.
-            if (engineMisses >= 3 && !engineHeard && !engineAudio && nextEngine()) {
+            if (engineMisses >= 6 && !engineHeard && !engineAudio && nextEngine()) {
                 destroyRecognizer();
                 listener.onVoiceHint(error);
                 handler.postDelayed(restart, RESTART_DELAY_MS);

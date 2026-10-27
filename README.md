@@ -72,7 +72,7 @@ Bangla model (bn-IN) is only tried after the recogniser has actually caught
 speech and still missed it, and Android's on-device recogniser only after real
 failures. If a service refuses with CLIENT/BUSY the next engine on the phone is
 tried, and an engine that never reports a voice or even a sound level (a stub
-some phones ship as the default) is skipped after a few silent attempts. Every
+some phones ship as the default) is skipped after six completely silent turns. Every
 voice event (start, ready, speech started, error name, result, insert, which
 engine) is written to an in-memory **voice log** at the bottom of the voice
 settings, with a copy button, because there is no logcat on the phone.
