@@ -100,9 +100,9 @@ public class KeyboardView extends View {
                 if (key == null || row != downRow || col != downCol) {
                     return;
                 }
-                if (key.type != Key.LANGUAGE) {
-                    // Only the language key has a long-press action. For every
-                    // other key the release still types normally.
+                if (key.type != Key.LANGUAGE && key.type != Key.MIC) {
+                    // Only the language and microphone keys have long-press
+                    // actions. For every other key the release types normally.
                     return;
                 }
                 longPressFired = true;
