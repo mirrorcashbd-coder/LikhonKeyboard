@@ -155,6 +155,10 @@ speech service, Likhon can offer the same kind of dictation, and this version
 matches Rambler's behaviour (continuous session, live partials, filler cleanup,
 spoken punctuation, delete command, level meter) without copying GPL code.
 
+On phones that refuse to give an input method any audio, even the system
+recogniser stays silent, so 1.5 also offers the phone's own voice screen — the
+same speech screen other apps use — as the default path.
+
 ## Bangla typing guide
 
 | Type | Get | Type | Get |
