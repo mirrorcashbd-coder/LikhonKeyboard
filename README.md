@@ -2,18 +2,18 @@
 
 A small, fast, **offline** Android keyboard with an English QWERTY layout and
 phonetic Bangla typing. Written in plain Java against the Android framework:
-no AndroidX, no third-party libraries, no ads, and nothing of its own ever goes
-online (the `INTERNET` permission is declared only for speech services that run
-inside the calling app).
+no AndroidX, no ads, and nothing leaves the phone. The only network use is the
+one-time, user-started download of an offline speech model; after that, voice
+typing works with the radio switched off.
 
-**APK:** `build/manual/LikhonKeyboard-2.1.apk` (also copied to
-`/sdcard/Download/LikhonKeyboard-2.1.apk`)
+**APK:** `build/manual/LikhonKeyboard-2.2.apk` (also copied to
+`/sdcard/Download/LikhonKeyboard-2.2.apk`)
 
 ---
 
 ## Install
 
-1. Open `LikhonKeyboard-2.1.apk` in the Files app and allow "install unknown apps"
+1. Open `LikhonKeyboard-2.2.apk` in the Files app and allow "install unknown apps"
    for that app if asked.
 2. Open **Likhon Keyboard** from the app drawer.
 3. Tap **Enable keyboard** → turn on "Likhon Keyboard".
@@ -46,7 +46,9 @@ the keyboard to open settings at any time.
 - **Enter key** shows Search / Send / Go / Done / Next when the app asks for it.
 - **Numeric keyboard** for number and phone fields.
 - **Bangla digits**, `।`, `ঁ`, `্` and `৳` in Bangla mode.
-- **Voice typing** in Bangla, Banglish and English (see below).
+- **Voice typing** in Bangla, Banglish and English (see below), online through
+  the phone's speech service or **fully offline** with a downloaded sherpa-onnx
+  model (Whisper or NVIDIA Parakeet).
 - **Word suggestions, always on**: a scrollable strip above the keys with up
   to 18 completions, visible even before the first letter. English uses the
   10,000 most common words, Bangla uses 18,000 words matched against what you
@@ -58,7 +60,8 @@ the keyboard to open settings at any time.
   keyboard taller or shorter; long-press the grip to reset it.
 - English **and** Bangla UI (follows the phone language).
 - Typing and suggestions are fully offline. The only runtime permission is the
-  microphone, and it is used only while voice typing is running.
+  microphone, and it is used only while voice typing is running. Offline voice
+  models are downloaded only when you tap Download in settings.
 
 ## Voice typing
 
@@ -112,8 +115,47 @@ Speech recognition is done by the speech service already on the phone (usually
 Google) — the same service Gboard uses for its Rambler voice typing. Bangla may
 need the Bangla language pack downloaded in that app, and some phones only do
 recognition online. The keyboard itself never sends anything anywhere: the
-`INTERNET` permission exists only because some speech services run in the
-calling app and need it to reach their own servers.
+`INTERNET` permission is used by speech services that run in the calling app,
+and by the one-time model download on the Offline voice screen. Neither sends
+audio or text to a server of ours; there is no server of ours.
+
+## Offline voice (on-device models)
+
+The voice strip has a second engine that never uses a server. It is the same
+stack the [humming-keyboard](https://github.com/muhib-karim/humming-keyboard)
+project uses: **sherpa-onnx** with an ONNX speech model, recorded and decoded
+inside the keyboard process.
+
+1. Settings → Voice → **Offline voice models**.
+2. Download one model (once, over Wi-Fi is best):
+
+| Model | Languages | Size | Notes |
+| --- | --- | --- | --- |
+| Whisper Tiny | বাংলা + English | 99 MB | fastest, short phrases |
+| Whisper Base | বাংলা + English | 153 MB | clearer; recommended |
+| Parakeet 0.6B | English | 631 MB | best English speed/accuracy; NVIDIA's model |
+
+3. In Settings → Voice → **Voice method**, pick **Offline (on this phone)**.
+   Automatic mode also falls back to the downloaded model when the phone's own
+   recogniser fails or no speech service is installed.
+
+The model files live in the app's private storage (`files/voice/<model>/`).
+Downloads show progress, can be cancelled, and are verified by exact file size
+before they are marked ready. Nothing is uploaded: recognition happens on the
+CPU, with no network permission needed at that point.
+
+How the recording works: `OfflineVoice` opens `AudioRecord` at 16 kHz mono,
+watches the level to find the start and end of a phrase (about 1.1 s of silence
+ends it, 30 s maximum), then decodes the phrase on a worker thread with
+`OfflineRecognizer` and commits the text. Continuous mode simply starts the next
+phrase after the result. The engine is released after three idle minutes so a
+large Parakeet model does not sit in RAM forever.
+
+**Bangla accuracy:** Whisper Base is the practical offline choice, but it is
+noticeably weaker than Google's online Bangla model, especially for long
+sentences. Parakeet understands English only. Nothing here is a substitute for
+the online service for difficult Bangla dictation — it is the option that still
+works with no connection.
 
 ## Editing toolbar
 
@@ -306,6 +348,8 @@ app/src/main/java/com/likhon/keyboard/
   WordDictionary.java   curated exceptions for irregular spellings
   Romanize.java         Bangla → Banglish, used by voice and by suggestions
   VoiceInput.java       SpeechRecognizer wrapper, continuous dictation
+  OfflineVoice.java     AudioRecord + sherpa-onnx on-device dictation
+  VoiceModels.java      model catalogue, downloader and install checks
   VoiceText.java        filler/stutter cleanup for dictated text
   Suggestions.java      prefix search over the two bundled word lists
   LearnedWords.java     persistence for words the person actually types
@@ -318,6 +362,7 @@ app/src/main/java/com/likhon/keyboard/
   StickerStore.java     favourites and the recent stickers list
   StickerProvider.java  read-only content:// image for the receiving app
   StickerPanel.java     sticker sheet: search, pack chips, grid
+  jniLibs/arm64-v8a/    sherpa-onnx and ONNX Runtime native libraries
 app/src/main/assets/    English + Bangla word lists for suggestions,
                         stickers/ (152 WebP files + catalogue)
 app/src/main/res/       manifest resources, method.xml, strings (en + bn), icons
@@ -413,11 +458,12 @@ stack:
 
 | Screen | What lives there |
 | --- | --- |
-| Home | keyboard status, six quick tiles, guide and system links |
+| Home | keyboard status, eight quick tiles, guide and system links |
 | Appearance | theme swatches, live preview, accent beads, key shape, size, spacing |
 | Typing | feedback, suggestions, number row, keyboard height, privacy |
 | Languages | writing mode and all 39 languages |
 | Voice | microphone, recognition engine, live tests and the log |
+| Offline voice | download, choose and delete on-device models |
 | Tools | shortcuts, clipboard, learned words |
 | Backup | export, import and reset |
 | About | version, libraries and the guide |
@@ -454,6 +500,9 @@ dexed straight into the APK by both build paths:
 | OkHttp | 3.14.9 | translation requests: timeouts, retries, one HTTP client |
 | Okio | 1.17.5 | OkHttp's I/O layer |
 | Gson | 2.10.1 | backup and restore of settings, shortcuts and clipboard (JSON) |
+| sherpa-onnx | 2.0.1 | offline speech recognition (classes from the AAR) |
+| Kotlin stdlib | 2.1.21 | runtime for sherpa-onnx's Kotlin API |
+| ONNX Runtime | (in sherpa AAR) | native inference, arm64-v8a |
 
 ```bash
 bash tools/add-lib.sh com.squareup.okhttp3:okhttp:3.14.9
@@ -467,6 +516,11 @@ English/Bangla names and search tags. The app only ever reads those bundled
 files, and the About screen credits the artwork.
 
 A plain JAR is copied as is; an AAR is unpacked and its `classes.jar` is kept.
+`sherpa-onnx` is the one AAR here: its four arm64 `.so` files are in
+`app/src/main/jniLibs/arm64-v8a/` and `tools/build-apk-arm64.sh` adds them to
+`lib/arm64-v8a/` in the APK (the manifest sets `extractNativeLibs="true"`).
+`sherpa-onnx` is Apache-2.0; Whisper models are MIT; Parakeet is covered by the
+NVIDIA Open Model License.
 AAR **resources** need the aapt2 pipeline (aapt2 2.19 runs on this phone), so a
 specific resource-carrying library can be wired in on request. AndroidX and
 Material Components are deliberately not used: they would add several megabytes
@@ -502,6 +556,22 @@ when the system animation scale is zero, and every interactive control keeps a
 48 dp touch target and a content description.
 
 ## Changes
+
+**2.2**
+
+- **Offline voice typing**: sherpa-onnx runs inside the keyboard, so dictation
+  works with no connection. Three downloadable models (Whisper Tiny/Base for
+  বাংলা + English, NVIDIA Parakeet 0.6B for English), exact-size verification,
+  progress and cancel.
+- New Settings → Voice → Offline voice models screen, a fourth voice method
+  (Offline), and automatic fallback to the local model when the phone's speech
+  service is missing or gives up.
+- 16 kHz `AudioRecord` capture with energy end-pointing, 30 s phrase cap,
+  continuous restart, level bar, and the engine released after three idle
+  minutes.
+- APK now ships the arm64 sherpa-onnx/ONNX Runtime libraries (about 31 MB
+  uncompressed, 12 MB in the APK); the models themselves are not bundled.
+- Voice log records engine load time, model id and every offline failure.
 
 **2.1**
 

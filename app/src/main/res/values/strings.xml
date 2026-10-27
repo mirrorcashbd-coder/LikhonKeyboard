@@ -45,7 +45,7 @@
 
     <string name="section_about">About</string>
     <string name="about_body">Likhon is a small, offline keyboard. It has no ads and never sends anything anywhere; the microphone is used only for voice typing. English is a standard QWERTY layout; Bangla is phonetic, so you type the sound in English letters.</string>
-    <string name="about_version">Version 2.1</string>
+    <string name="about_version">Version 2.2</string>
     <string name="footer">Offline · No ads · Optional microphone</string>
     <string name="about_guide">Bangla typing guide</string>
 
@@ -238,14 +238,14 @@
     <string name="backup_restored">Restored %1$d settings, %2$d shortcuts and %3$d clips</string>
     <string name="backup_failed">Could not use that file: %1$s</string>
     <string name="backup_no_files">No file manager available</string>
-    <string name="about_libraries">Libraries: OkHttp 3.14.9 · Okio 1.17.5 · Gson 2.10.1</string>
+    <string name="about_libraries">Libraries: OkHttp 3.14.9 · Okio 1.17.5 · Gson 2.10.1 · sherpa-onnx 2.0.1 · Kotlin stdlib 2.1.21</string>
     <string name="theme_aurora">Aurora</string>
     <string name="theme_midnight">Midnight</string>
     <string name="theme_paper">Paper</string>
     <string name="theme_glacier">Glacier</string>
     <string name="theme_neon">Neon</string>
     <string name="theme_graphite">Graphite</string>
-    <string name="hero_version">v2.1</string>
+    <string name="hero_version">v2.2</string>
     <string name="key_gap">Key spacing</string>
     <string name="gap_compact">Compact</string>
     <string name="gap_normal">Normal</string>
@@ -319,4 +319,50 @@
     <string name="sticker_preview_unfav">Unfavourite</string>
     <string name="sticker_preview_close">Close</string>
     <string name="sticker_license">Sticker artwork by Microsoft Fluent Emoji, MIT licence.</string>
+
+    <!-- Offline (on-device) voice -->
+    <string name="screen_offline">Offline voice</string>
+    <string name="screen_offline_desc">Models that run on this phone</string>
+    <string name="offline_hero_title">Dictation without internet</string>
+    <string name="offline_hero_desc">Download a model once. After that, speech is decoded on this phone and nothing is uploaded.</string>
+    <string name="offline_status_none">No model downloaded yet</string>
+    <string name="offline_status_ready">%1$s is ready</string>
+    <string name="offline_usage">Using %1$s</string>
+    <string name="offline_usage_bytes">%1$s used by downloaded models</string>
+    <string name="offline_no_space_used">No storage used yet</string>
+    <string name="offline_models_title">Models</string>
+    <string name="offline_lang_both">বাংলা + English</string>
+    <string name="offline_lang_en">English</string>
+    <string name="offline_recommended">Recommended</string>
+    <string name="offline_download">Download</string>
+    <string name="offline_cancel">Cancel</string>
+    <string name="offline_delete">Delete</string>
+    <string name="offline_use">Use</string>
+    <string name="offline_in_use">In use</string>
+    <string name="offline_downloading">Downloading…</string>
+    <string name="offline_percent">%1$d%% · %2$s / %3$s</string>
+    <string name="offline_delete_title">Delete model?</string>
+    <string name="offline_delete_message">%1$s will be removed. You can download it again later.</string>
+    <string name="offline_confirm_title">Download %1$s?</string>
+    <string name="offline_confirm_message">%1$s will be downloaded once (%2$s). After that, dictation works offline.</string>
+    <string name="offline_error">Download failed: %1$s</string>
+    <string name="offline_error_space">Not enough free storage for this model.</string>
+    <string name="offline_error_busy">Another model is downloading.</string>
+    <string name="offline_note">Use Wi-Fi for the first download. Model files stay in the app\'s private storage and are never uploaded.</string>
+    <string name="offline_license">Engine: sherpa-onnx (Apache-2.0). Models: Whisper (MIT) and NVIDIA Parakeet (NVIDIA Open Model License).</string>
+    <string name="offline_manage">Offline voice models</string>
+    <string name="vm_note_tiny">Fastest and smallest. Bangla and English; best for short phrases.</string>
+    <string name="vm_note_base">Balanced. Bangla and English; clearer than Tiny.</string>
+    <string name="vm_note_parakeet">Best English accuracy and speed; English only. The model used by humming-keyboard.</string>
+    <string name="voice_mode_offline">Offline (on this phone)</string>
+    <string name="voice_offline_english_only">Parakeet understands English only. Choose a Whisper model for Bangla.</string>
+    <string name="voice_offline_no_model">Download an offline voice model first.</string>
+    <string name="voice_offline_loading">Opening the voice model…</string>
+    <string name="voice_offline_decoding">Writing what you said…</string>
+    <string name="voice_offline_heard_nothing">Nothing was heard. Try again.</string>
+    <string name="voice_offline_load_failed">The offline model could not be opened.</string>
+    <string name="voice_offline_decode_failed">The offline engine could not decode this phrase.</string>
+    <string name="voice_offline_mic_failed">The microphone could not be opened.</string>
+    <string name="voice_offline_ready">Listening offline…</string>
+    <string name="voice_offline_note">Offline dictation never sends audio anywhere. Pause for a second and the phrase is written.</string>
 </resources>

@@ -45,7 +45,7 @@
 
     <string name="section_about">সম্পর্কে</string>
     <string name="about_body">লিখন একটি ছোট, অফলাইন কীবোর্ড। এতে বিজ্ঞাপন নেই এবং কোথাও কিছু পাঠায় না; মাইক্রোফোন কেবল ভয়েস টাইপিংয়ে ব্যবহার হয়। ইংরেজি সাধারণ QWERTY লেআউট; বাংলা ফোনেটিক, অর্থাৎ ইংরেজি অক্ষরে যেভাবে উচ্চারণ হয় সেভাবে লিখলেই বাংলা হয়।</string>
-    <string name="about_version">সংস্করণ ২.১</string>
+    <string name="about_version">সংস্করণ ২.২</string>
     <string name="footer">অফলাইন · বিজ্ঞাপন নেই · মাইক অনুমতি ঐচ্ছিক</string>
     <string name="about_guide">বাংলা টাইপিং নির্দেশিকা</string>
 
@@ -238,14 +238,14 @@
     <string name="backup_restored">%1$d সেটিংস, %2$d শর্টকাট ও %3$d ক্লিপ ফিরে এসেছে</string>
     <string name="backup_failed">ফাইলটি ব্যবহার করা গেল না: %1$s</string>
     <string name="backup_no_files">কোনো ফাইল ম্যানেজার পাওয়া যায়নি</string>
-    <string name="about_libraries">লাইব্রেরি: OkHttp 3.14.9 · Okio 1.17.5 · Gson 2.10.1</string>
+    <string name="about_libraries">লাইব্রেরি: OkHttp 3.14.9 · Okio 1.17.5 · Gson 2.10.1 · sherpa-onnx 2.0.1 · Kotlin stdlib 2.1.21</string>
     <string name="theme_aurora">অরোরা</string>
     <string name="theme_midnight">মিডনাইট</string>
     <string name="theme_paper">পেপার</string>
     <string name="theme_glacier">গ্লেসিয়ার</string>
     <string name="theme_neon">নিয়ন</string>
     <string name="theme_graphite">গ্রাফাইট</string>
-    <string name="hero_version">v২.১</string>
+    <string name="hero_version">v২.২</string>
     <string name="key_gap">কী-এর ফাঁক</string>
     <string name="gap_compact">ঘন</string>
     <string name="gap_normal">স্বাভাবিক</string>
@@ -319,4 +319,50 @@
     <string name="sticker_preview_unfav">প্রিয় থেকে সরান</string>
     <string name="sticker_preview_close">বন্ধ</string>
     <string name="sticker_license">স্টিকার আর্ট: Microsoft Fluent Emoji, MIT লাইসেন্স।</string>
+
+    <!-- Offline (on-device) voice -->
+    <string name="screen_offline">অফলাইন ভয়েস</string>
+    <string name="screen_offline_desc">ফোনেই চলে এমন ভয়েস মডেল</string>
+    <string name="offline_hero_title">ইন্টারনেট ছাড়াই ডিকটেশন</string>
+    <string name="offline_hero_desc">একবার মডেল ডাউনলোড করুন। এরপর কথা এই ফোনেই লেখা হবে, কিছুই কোথাও পাঠানো হয় না।</string>
+    <string name="offline_status_none">এখনো কোনো মডেল ডাউনলোড করা হয়নি</string>
+    <string name="offline_status_ready">%1$s প্রস্তুত</string>
+    <string name="offline_usage">ব্যবহার হচ্ছে %1$s</string>
+    <string name="offline_usage_bytes">ডাউনলোড করা মডেল %1$s জায়গা নিয়েছে</string>
+    <string name="offline_no_space_used">এখনো কোনো জায়গা নেয়নি</string>
+    <string name="offline_models_title">মডেল</string>
+    <string name="offline_lang_both">বাংলা + English</string>
+    <string name="offline_lang_en">English</string>
+    <string name="offline_recommended">প্রস্তাবিত</string>
+    <string name="offline_download">ডাউনলোড</string>
+    <string name="offline_cancel">বাতিল</string>
+    <string name="offline_delete">মুছুন</string>
+    <string name="offline_use">ব্যবহার করুন</string>
+    <string name="offline_in_use">ব্যবহৃত হচ্ছে</string>
+    <string name="offline_downloading">ডাউনলোড হচ্ছে…</string>
+    <string name="offline_percent">%1$d%% · %2$s / %3$s</string>
+    <string name="offline_delete_title">মডেল মুছবেন?</string>
+    <string name="offline_delete_message">%1$s মুছে যাবে। পরে আবার ডাউনলোড করা যাবে।</string>
+    <string name="offline_confirm_title">%1$s ডাউনলোড করবেন?</string>
+    <string name="offline_confirm_message">একবার %1$s (%2$s) ডাউনলোড হবে। এরপর ইন্টারনেট ছাড়াই ডিকটেশন চলবে।</string>
+    <string name="offline_error">ডাউনলোড ব্যর্থ: %1$s</string>
+    <string name="offline_error_space">এই মডেলের জন্য যথেষ্ট ফাঁকা জায়গা নেই।</string>
+    <string name="offline_error_busy">আরেকটি মডেল ডাউনলোড হচ্ছে।</string>
+    <string name="offline_note">প্রথম ডাউনলোডে Wi-Fi ব্যবহার করুন। মডেল ফাইল অ্যাপের নিজস্ব স্টোরেজে থাকে, কোথাও আপলোড হয় না।</string>
+    <string name="offline_license">ইঞ্জিন: sherpa-onnx (Apache-2.0)। মডেল: Whisper (MIT) ও NVIDIA Parakeet (NVIDIA Open Model License)।</string>
+    <string name="offline_manage">অফলাইন ভয়েস মডেল</string>
+    <string name="vm_note_tiny">সবচেয়ে দ্রুত ও ছোট। বাংলা ও English; ছোট বাক্যের জন্য ভালো।</string>
+    <string name="vm_note_base">ভারসাম্যপূর্ণ। বাংলা ও English; Tiny-এর চেয়ে পরিষ্কার।</string>
+    <string name="vm_note_parakeet">English-এ সেরা নির্ভুলতা ও গতি; শুধু English। humming-keyboard যে মডেল ব্যবহার করে।</string>
+    <string name="voice_mode_offline">অফলাইন (এই ফোনেই)</string>
+    <string name="voice_offline_english_only">Parakeet শুধু English বোঝে। বাংলার জন্য Whisper মডেল বেছে নিন।</string>
+    <string name="voice_offline_no_model">আগে একটি অফলাইন ভয়েস মডেল ডাউনলোড করুন।</string>
+    <string name="voice_offline_loading">ভয়েস মডেল খোলা হচ্ছে…</string>
+    <string name="voice_offline_decoding">লেখা হচ্ছে…</string>
+    <string name="voice_offline_heard_nothing">কিছু শোনা যায়নি। আবার চেষ্টা করুন।</string>
+    <string name="voice_offline_load_failed">অফলাইন মডেল খোলা যায়নি।</string>
+    <string name="voice_offline_decode_failed">এই বাক্যটি ডিকোড করা যায়নি।</string>
+    <string name="voice_offline_mic_failed">মাইক্রোফোন খোলা যায়নি।</string>
+    <string name="voice_offline_ready">অফলাইনে শুনছি…</string>
+    <string name="voice_offline_note">অফলাইন ডিকটেশন কখনোই অডিও কোথাও পাঠায় না। এক সেকেন্ড থামলে বাক্যটি লেখা হয়ে যায়।</string>
 </resources>

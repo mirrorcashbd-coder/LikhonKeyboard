@@ -44,6 +44,7 @@ import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -53,6 +54,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -87,7 +89,8 @@ public class SettingsActivity extends Activity {
     private static final String SCREEN_APPEARANCE = "appearance";
     private static final String SCREEN_TYPING = "typing";
     private static final String SCREEN_LANGUAGES = "languages";
-    private static final String SCREEN_VOICE = "voice";
+    static final String SCREEN_VOICE = "voice";
+    static final String SCREEN_OFFLINE = "offline";
     private static final String SCREEN_TOOLS = "tools";
     private static final String SCREEN_STICKERS = "stickers";
     private static final String SCREEN_BACKUP = "backup";
@@ -124,6 +127,14 @@ public class SettingsActivity extends Activity {
     private TextView stickerCountView;
     private EditText stickerSearch;
     private StickerStore stickerStore;
+    private LinearLayout offlineModels;
+    private TextView offlineStatus;
+    private TextView offlineUsage;
+    private View offlineStatusDot;
+    private String offlineSignature = "";
+    private final Map<String, ProgressBar> offlineBars = new HashMap<>();
+    private final Map<String, TextView> offlinePercents = new HashMap<>();
+    private final Map<String, LinearLayout> offlineProgressRows = new HashMap<>();
     private SpeechRecognizer speechTest;
     private final Handler testHandler = new Handler(Looper.getMainLooper());
     private final Runnable speechTimeout = () ->
@@ -163,6 +174,8 @@ public class SettingsActivity extends Activity {
         refreshVoiceStatus();
         refreshVoiceLog();
         refreshClipStore();
+        VoiceModels.setObserver(() -> runOnUiThread(this::refreshOfflineDownload));
+        refreshOfflineDownload();
     }
 
     private void refreshClipStore() {
@@ -464,6 +477,7 @@ public class SettingsActivity extends Activity {
         screens.put(SCREEN_TYPING, buildTypingScreen());
         screens.put(SCREEN_LANGUAGES, buildLanguagesScreen());
         screens.put(SCREEN_VOICE, buildVoiceScreen());
+        screens.put(SCREEN_OFFLINE, buildOfflineScreen());
         screens.put(SCREEN_TOOLS, buildToolsScreen());
         screens.put(SCREEN_STICKERS, buildStickersScreen());
         screens.put(SCREEN_BACKUP, buildBackupScreen());
@@ -845,6 +859,293 @@ public class SettingsActivity extends Activity {
         addSection(body, getString(R.string.section_voice),
                 getString(R.string.section_voice_desc), buildVoiceCard());
         return subScreen(R.string.screen_voice, R.string.screen_voice_desc, body);
+    }
+
+    // -------------------------------------------------------- offline screen
+
+    private View buildOfflineScreen() {
+        LinearLayout body = M3.body(this);
+
+        LinearLayout hero = M3.card(this, palette);
+        LinearLayout head = Ui.horizontal(this);
+        offlineStatusDot = Ui.dot(this, palette.textMuted, 10);
+        LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(dp(10), dp(10));
+        dotParams.rightMargin = dp(10);
+        head.addView(offlineStatusDot, dotParams);
+        offlineStatus = Ui.text(this, "", 16, palette.text, true);
+        head.addView(offlineStatus, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        hero.addView(head);
+
+        TextView desc = Ui.text(this, getString(R.string.offline_hero_desc), 12.5f,
+                palette.textMuted, false);
+        desc.setLineSpacing(dp(3), 1f);
+        desc.setPadding(0, dp(9), 0, 0);
+        hero.addView(desc);
+
+        offlineUsage = Ui.text(this, "", 12, palette.textMuted, false);
+        offlineUsage.setPadding(0, dp(9), 0, 0);
+        hero.addView(offlineUsage);
+
+        addSection(body, getString(R.string.offline_hero_title), null, hero);
+
+        offlineModels = Ui.vertical(this);
+        addSection(body, getString(R.string.offline_models_title), null, offlineModels);
+        offlineSignature = "";
+        rebuildOfflineModels();
+
+        LinearLayout note = M3.card(this, palette);
+        TextView noteView = Ui.text(this, getString(R.string.offline_note), 12,
+                palette.textMuted, false);
+        noteView.setLineSpacing(dp(3), 1f);
+        note.addView(noteView);
+        TextView license = Ui.text(this, getString(R.string.offline_license), 11,
+                palette.textMuted, false);
+        license.setPadding(0, dp(10), 0, 0);
+        note.addView(license);
+        addCard(body, note);
+
+        return subScreen(R.string.screen_offline, R.string.screen_offline_desc, body);
+    }
+
+    private void rebuildOfflineModels() {
+        if (offlineModels == null) {
+            return;
+        }
+        offlineModels.removeAllViews();
+        offlineBars.clear();
+        offlinePercents.clear();
+        offlineProgressRows.clear();
+
+        VoiceModels.State state = VoiceModels.state();
+        VoiceModels.Model active = VoiceModels.selected(this);
+        String selectedId = active == null ? "" : active.id;
+        for (VoiceModels.Model model : VoiceModels.all()) {
+            boolean installed = VoiceModels.installed(this, model);
+            boolean downloading = state != null && state.running
+                    && model.id.equals(state.modelId);
+
+            LinearLayout card = M3.card(this, palette);
+            LinearLayout nameRow = Ui.horizontal(this);
+            TextView name = Ui.text(this, model.name, 16, palette.text, true);
+            nameRow.addView(name, new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            if (model.recommended) {
+                nameRow.addView(M3.chip(this, palette,
+                        getString(R.string.offline_recommended), true, () -> { }));
+            }
+            card.addView(nameRow);
+
+            String langs = getString(model.bangla
+                    ? R.string.offline_lang_both : R.string.offline_lang_en);
+            TextView meta = Ui.text(this, langs + " · " + VoiceModels.size(model.total),
+                    12, palette.textMuted, false);
+            meta.setPadding(0, dp(4), 0, 0);
+            card.addView(meta);
+
+            TextView about = Ui.text(this, getString(model.noteRes), 12,
+                    palette.textMuted, false);
+            about.setLineSpacing(dp(3), 1f);
+            about.setPadding(0, dp(7), 0, 0);
+            card.addView(about);
+
+            LinearLayout progressRow = Ui.vertical(this);
+            progressRow.setPadding(0, dp(12), 0, 0);
+            ProgressBar bar = new ProgressBar(this, null,
+                    android.R.attr.progressBarStyleHorizontal);
+            bar.setMax(1000);
+            bar.setProgressTintList(ColorStateList.valueOf(palette.accent));
+            bar.setProgressBackgroundTintList(ColorStateList.valueOf(
+                    M3.outlineVariant(palette)));
+            progressRow.addView(bar, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, dp(4)));
+            TextView percent = Ui.text(this, "", 11.5f, palette.textMuted, false);
+            percent.setPadding(0, dp(7), 0, 0);
+            progressRow.addView(percent);
+            progressRow.setVisibility(downloading ? View.VISIBLE : View.GONE);
+            card.addView(progressRow);
+            offlineProgressRows.put(model.id, progressRow);
+            offlineBars.put(model.id, bar);
+            offlinePercents.put(model.id, percent);
+
+            if (state != null && !state.running && state.error != null
+                    && model.id.equals(state.modelId)) {
+                TextView error = Ui.text(this, "space".equals(state.error)
+                        ? getString(R.string.offline_error_space)
+                        : getString(R.string.offline_error, state.error),
+                        12, palette.text, false);
+                error.setPadding(0, dp(10), 0, 0);
+                card.addView(error);
+            }
+
+            LinearLayout actions = Ui.horizontal(this);
+            actions.setGravity(Gravity.END);
+            if (downloading) {
+                actions.addView(Ui.button(this, palette,
+                        getString(R.string.offline_cancel), false,
+                        () -> {
+                            VoiceModels.cancel();
+                            refreshOfflineDownload();
+                        }));
+            } else if (installed) {
+                if (model.id.equals(selectedId)) {
+                    actions.addView(M3.chip(this, palette,
+                            getString(R.string.offline_in_use), true, () -> { }));
+                } else {
+                    actions.addView(Ui.button(this, palette,
+                            getString(R.string.offline_use), true,
+                            () -> useVoiceModel(model)));
+                }
+                LinearLayout.LayoutParams gap = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT);
+                gap.leftMargin = dp(8);
+                actions.addView(Ui.button(this, palette,
+                        getString(R.string.offline_delete), false,
+                        () -> confirmDeleteVoiceModel(model)), gap);
+            } else {
+                actions.addView(Ui.button(this, palette,
+                        getString(R.string.offline_download), true,
+                        () -> confirmDownloadVoiceModel(model)));
+            }
+            addWithTopMargin(card, actions, 13);
+
+            LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            if (offlineModels.getChildCount() > 0) {
+                cardParams.topMargin = dp(10);
+            }
+            offlineModels.addView(card, cardParams);
+        }
+        updateOfflineProgress();
+        updateOfflineHero();
+    }
+
+    private String offlineSignature() {
+        VoiceModels.State state = VoiceModels.state();
+        VoiceModels.Model active = VoiceModels.selected(this);
+        String selectedId = active == null ? "" : active.id;
+        StringBuilder out = new StringBuilder();
+        for (VoiceModels.Model model : VoiceModels.all()) {
+            out.append(model.id)
+                    .append(VoiceModels.installed(this, model) ? '1' : '0')
+                    .append(model.id.equals(selectedId) ? 's' : '-');
+            boolean downloading = state != null && state.running
+                    && model.id.equals(state.modelId);
+            out.append(downloading ? 'd' : '-');
+            boolean error = state != null && !state.running && state.error != null
+                    && model.id.equals(state.modelId);
+            out.append(error ? 'e' : '-');
+        }
+        return out.toString();
+    }
+
+    private void refreshOfflineDownload() {
+        if (offlineModels == null) {
+            return;
+        }
+        String signature = offlineSignature();
+        if (!signature.equals(offlineSignature)) {
+            offlineSignature = signature;
+            rebuildOfflineModels();
+            return;
+        }
+        updateOfflineProgress();
+        updateOfflineHero();
+    }
+
+    private void updateOfflineProgress() {
+        VoiceModels.State state = VoiceModels.state();
+        for (VoiceModels.Model model : VoiceModels.all()) {
+            LinearLayout row = offlineProgressRows.get(model.id);
+            if (row == null) {
+                continue;
+            }
+            boolean running = state != null && state.running
+                    && model.id.equals(state.modelId);
+            row.setVisibility(running ? View.VISIBLE : View.GONE);
+            if (!running) {
+                continue;
+            }
+            int permille = state.total <= 0 ? 0
+                    : (int) Math.min(1000, state.done * 1000 / state.total);
+            ProgressBar bar = offlineBars.get(model.id);
+            if (bar != null) {
+                bar.setProgress(permille);
+            }
+            TextView percent = offlinePercents.get(model.id);
+            if (percent != null) {
+                percent.setText(getString(R.string.offline_percent, permille / 10,
+                        VoiceModels.size(state.done), VoiceModels.size(state.total)));
+            }
+        }
+    }
+
+    private void updateOfflineHero() {
+        if (offlineStatus == null) {
+            return;
+        }
+        VoiceModels.Model ready = VoiceModels.selected(this);
+        offlineStatus.setText(ready == null
+                ? getString(R.string.offline_status_none)
+                : getString(R.string.offline_status_ready, ready.name));
+        long used = VoiceModels.installedBytes(this);
+        offlineUsage.setText(used == 0
+                ? getString(R.string.offline_no_space_used)
+                : getString(R.string.offline_usage_bytes, VoiceModels.size(used)));
+        if (offlineStatusDot != null) {
+            offlineStatusDot.setBackground(Ui.rounded(this,
+                    ready == null ? palette.textMuted : palette.accent, 5));
+        }
+    }
+
+    private void confirmDownloadVoiceModel(VoiceModels.Model model) {
+        VoiceModels.State state = VoiceModels.state();
+        if (state != null && state.running) {
+            Toast.makeText(this, R.string.offline_error_busy, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        AppDialog.show(this, palette,
+                getString(R.string.offline_confirm_title, model.name),
+                getString(R.string.offline_confirm_message, model.name,
+                        VoiceModels.size(model.total)),
+                getString(R.string.offline_download),
+                () -> {
+                    if (!VoiceModels.download(this, model)) {
+                        VoiceModels.State now = VoiceModels.state();
+                        int message = now != null && "space".equals(now.error)
+                                ? R.string.offline_error_space : R.string.offline_error_busy;
+                        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                    }
+                    offlineSignature = "";
+                    refreshOfflineDownload();
+                },
+                getString(R.string.offline_cancel), null);
+    }
+
+    private void confirmDeleteVoiceModel(VoiceModels.Model model) {
+        if (VoiceModels.isDownloading(model.id)) {
+            return;
+        }
+        AppDialog.show(this, palette,
+                getString(R.string.offline_delete_title),
+                getString(R.string.offline_delete_message, model.name),
+                getString(R.string.offline_delete),
+                () -> {
+                    VoiceModels.delete(this, model);
+                    VoiceModels.Model next = VoiceModels.selected(this);
+                    prefs.setVoiceModelId(next == null ? "" : next.id);
+                    offlineSignature = "";
+                    refreshOfflineDownload();
+                },
+                getString(R.string.offline_cancel), null);
+    }
+
+    private void useVoiceModel(VoiceModels.Model model) {
+        prefs.setVoiceModelId(model.id);
+        offlineSignature = "";
+        refreshOfflineDownload();
     }
 
     // ---------------------------------------------------------- tools screen
@@ -1527,6 +1828,14 @@ public class SettingsActivity extends Activity {
         engineNote.setPadding(0, dp(6), 0, 0);
         card.addView(engineNote);
 
+        VoiceModels.Model ready = VoiceModels.selected(this);
+        String modelStatus = ready == null
+                ? getString(R.string.offline_status_none)
+                : getString(R.string.offline_usage, ready.name);
+        addWithTopMargin(card, M3.navRow(this, palette, R.drawable.ic_mic,
+                getString(R.string.offline_manage), modelStatus,
+                () -> open(SCREEN_OFFLINE)), 18);
+
         if (!hasPackage("com.google.android.googlequicksearchbox")) {
             LinearLayout googleRow = Ui.horizontal(this);
             TextView googleNote = Ui.text(this, getString(R.string.voice_google_missing),
@@ -1604,11 +1913,16 @@ public class SettingsActivity extends Activity {
                 {Prefs.VOICE_MODE_AUTO, getString(R.string.voice_mode_auto)},
                 {Prefs.VOICE_MODE_INLINE, getString(R.string.voice_mode_inline)},
                 {Prefs.VOICE_MODE_SCREEN, getString(R.string.voice_mode_screen)},
+                {Prefs.VOICE_MODE_OFFLINE, getString(R.string.voice_mode_offline)},
         };
         for (String[] option : options) {
             TextView chip = makeChip(option[1], selected.equals(option[0]), () -> {
                 prefs.setVoiceMode(option[0]);
                 rebuildVoiceModeChips();
+                if (Prefs.VOICE_MODE_OFFLINE.equals(option[0])
+                        && VoiceModels.selected(this) == null) {
+                    open(SCREEN_OFFLINE);
+                }
             });
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -1956,6 +2270,7 @@ public class SettingsActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
+        VoiceModels.setObserver(null);
         stopSpeechTest();
     }
 

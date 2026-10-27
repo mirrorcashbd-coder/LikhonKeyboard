@@ -20,8 +20,8 @@ SDK="${ANDROID_SDK_ROOT:-/root/android-sdk}"
 PLATFORM="$SDK/platforms/android-34/android.jar"
 D8_JAR="$SDK/build-tools/34.0.0/lib/d8.jar"
 OUT="build/manual"
-VERSION_NAME="2.1"
-VERSION_CODE="24"
+VERSION_NAME="2.2"
+VERSION_CODE="25"
 MIN_SDK="23"
 TARGET_SDK="34"
 
@@ -94,6 +94,18 @@ aapt package -f \
     -F "$OUT/app.unaligned.apk"
 
 (cd "$OUT/dex" && aapt add "../app.unaligned.apk" classes.dex >/dev/null)
+
+# Native libraries (offline speech engine). aapt packages resources only, so
+# the .so files are added to the archive afterwards, in the lib/<abi>/ layout
+# Android expects. extractNativeLibs="true" in the manifest lets the installer
+# unpack them even though they are compressed here.
+if [ -d app/src/main/jniLibs ]; then
+    echo "==> native libraries"
+    mkdir -p "$OUT/native/lib/arm64-v8a"
+    cp app/src/main/jniLibs/arm64-v8a/*.so "$OUT/native/lib/arm64-v8a/"
+    APK_ABS="$(pwd)/$OUT/app.unaligned.apk"
+    (cd "$OUT/native" && aapt add "$APK_ABS" lib/arm64-v8a/*.so >/dev/null)
+fi
 
 echo "==> align"
 zipalign -f 4 "$OUT/app.unaligned.apk" "$OUT/app.aligned.apk"

@@ -23,6 +23,7 @@ final class Prefs {
     static final String KEY_VOICE_CLEANUP = "voice_cleanup";
     static final String KEY_VOICE_ENGINE = "voice_engine";
     static final String KEY_VOICE_MODE = "voice_mode";
+    static final String KEY_VOICE_MODEL = "voice_model";
     static final String KEY_HEIGHT = "keyboard_height";
     static final String KEY_POPUP = "key_popup";
     static final String KEY_NUMBER_ROW = "number_row";
@@ -46,6 +47,8 @@ final class Prefs {
     static final String VOICE_MODE_INLINE = "inline";
     /** Always use the phone's speech screen (Google voice). */
     static final String VOICE_MODE_SCREEN = "screen";
+    /** Record here and decode with the downloaded on-device model. */
+    static final String VOICE_MODE_OFFLINE = "offline";
 
     static final int THEME_SYSTEM = 0;
     static final int THEME_LIGHT = 1;
@@ -200,6 +203,14 @@ final class Prefs {
 
     void setVoiceMode(String value) {
         sp.edit().putString(KEY_VOICE_MODE, value).apply();
+    }
+
+    String voiceModelId() {
+        return sp.getString(KEY_VOICE_MODEL, "");
+    }
+
+    void setVoiceModelId(String value) {
+        sp.edit().putString(KEY_VOICE_MODEL, value == null ? "" : value).apply();
     }
 
     int accent() {

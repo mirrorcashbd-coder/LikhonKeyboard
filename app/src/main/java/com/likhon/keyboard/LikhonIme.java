@@ -67,6 +67,8 @@ public class LikhonIme extends InputMethodService
     private TextView voiceMode;
     private TextView voiceStopView;
     private VoiceInput voice;
+    private OfflineVoice offlineVoice;
+    private boolean offlineActive;
     private boolean voiceListening;
     private boolean voicePreviewing;
     private View voiceLevel;
@@ -179,6 +181,10 @@ public class LikhonIme extends InputMethodService
         if (voice != null) {
             voice.destroy();
             voice = null;
+        }
+        if (offlineVoice != null) {
+            offlineVoice.destroy();
+            offlineVoice = null;
         }
         if (prefs != null) {
             prefs.unregister(this);
@@ -1973,18 +1979,16 @@ public class LikhonIme extends InputMethodService
             return;
         }
         String mode = prefs.voiceMode();
+        if (Prefs.VOICE_MODE_OFFLINE.equals(mode)) {
+            startOfflineVoice();
+            return;
+        }
         if (Prefs.VOICE_MODE_SCREEN.equals(mode)) {
             VoiceLog.add("voice screen (always)");
             openVoiceScreen();
             return;
         }
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
-                != PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(this, R.string.voice_permission_needed, Toast.LENGTH_LONG).show();
-            Intent intent = new Intent(this, SettingsActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            intent.putExtra(SettingsActivity.EXTRA_REQUEST_MIC, true);
-            startActivity(intent);
+        if (!ensureMicPermission()) {
             return;
         }
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
@@ -2021,6 +2025,179 @@ public class LikhonIme extends InputMethodService
             uiHandler.removeCallbacks(voiceScreenFallback);
             uiHandler.postDelayed(voiceScreenFallback, 5000);
         }
+    }
+
+    /** Asks for the microphone by opening the settings screen that can request it. */
+    private boolean ensureMicPermission() {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                == PackageManager.PERMISSION_GRANTED) {
+            return true;
+        }
+        Toast.makeText(this, R.string.voice_permission_needed, Toast.LENGTH_LONG).show();
+        Intent intent = new Intent(this, SettingsActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        intent.putExtra(SettingsActivity.EXTRA_REQUEST_MIC, true);
+        startActivity(intent);
+        return false;
+    }
+
+    /** Records here and decodes with the downloaded sherpa-onnx model. */
+    private void startOfflineVoice() {
+        if (!ensureMicPermission()) {
+            return;
+        }
+        VoiceModels.Model model = VoiceModels.selected(this);
+        if (model == null) {
+            VoiceLog.add("offline voice: no model");
+            Toast.makeText(this, R.string.voice_offline_no_model, Toast.LENGTH_LONG).show();
+            Intent intent = new Intent(this, SettingsActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            intent.putExtra(SettingsActivity.EXTRA_OPEN,
+                    SettingsActivity.SCREEN_OFFLINE);
+            startActivity(intent);
+            return;
+        }
+        finishWord();
+        hideCandidates();
+        resetVoiceLevel();
+        voicePreviewing = false;
+        voiceListening = true;
+        offlineActive = true;
+        voiceGotText = false;
+        keyboardView.setVoiceActive(true);
+        voicePanel.setVisibility(View.VISIBLE);
+        voiceStatus.setText(R.string.voice_offline_loading);
+        updateVoiceLabels();
+        if (offlineVoice == null) {
+            offlineVoice = new OfflineVoice(this, offlineListener);
+        }
+        VoiceLog.add("offline voice: " + model.id);
+        if (model.kind == VoiceModels.KIND_TRANSDUCER && voiceIsBangla()) {
+            Toast.makeText(this, R.string.voice_offline_english_only,
+                    Toast.LENGTH_LONG).show();
+        }
+        offlineVoice.start(voiceLanguage(), prefs.voiceContinuous());
+    }
+
+    private final OfflineVoice.Listener offlineListener = new OfflineVoice.Listener() {
+        @Override
+        public void onOfflineLoading() {
+            if (voiceListening && voiceStatus != null) {
+                voiceStatus.setText(R.string.voice_offline_loading);
+            }
+        }
+
+        @Override
+        public void onOfflineReady() {
+            if (voiceListening && voiceStatus != null) {
+                voiceStatus.setText(R.string.voice_offline_ready);
+            }
+            updateVoiceLabels();
+        }
+
+        @Override
+        public void onOfflineLevel(float level) {
+            if (voiceLevel == null || voiceLevelParams == null) {
+                return;
+            }
+            int width = dp(3 + Math.round(level * 42f));
+            if (voiceLevelParams.width != width) {
+                voiceLevelParams.width = width;
+                voiceLevel.setLayoutParams(voiceLevelParams);
+            }
+        }
+
+        @Override
+        public void onOfflineStatus(int stringRes) {
+            if (voiceListening && voiceStatus != null) {
+                voiceStatus.setText(stringRes);
+            }
+        }
+
+        @Override
+        public void onOfflineResult(String text) {
+            if (VoiceText.isDeleteCommand(text)) {
+                deleteLastWord();
+                if (voiceStatus != null) {
+                    voiceStatus.setText(R.string.voice_deleted);
+                }
+                return;
+            }
+            String converted = voiceText(text);
+            if (converted.isEmpty()) {
+                return;
+            }
+            voicePreviewing = false;
+            voiceGotText = true;
+            recordUndo(false);
+            commit(converted + voiceSuffix());
+            VoiceLog.add("offline insert: " + converted);
+            learnSentence(converted);
+            if (voiceStatus != null) {
+                voiceStatus.setText(converted);
+            }
+        }
+
+        @Override
+        public void onOfflineHint(int stringRes) {
+            if (voiceListening && voiceStatus != null) {
+                voiceStatus.setText(stringRes);
+            }
+        }
+
+        @Override
+        public void onOfflineError(int stringRes, String detail) {
+            offlineActive = false;
+            voiceListening = false;
+            resetVoiceLevel();
+            if (keyboardView != null) {
+                keyboardView.setVoiceActive(false);
+            }
+            if (voicePanel != null) {
+                voicePanel.setVisibility(View.VISIBLE);
+            }
+            String message = getString(stringRes);
+            if (voiceStatus != null) {
+                voiceStatus.setText(message);
+            }
+            Toast.makeText(LikhonIme.this, message, Toast.LENGTH_LONG).show();
+            VoiceLog.add("offline failed: " + detail);
+            if (uiHandler != null) {
+                uiHandler.postDelayed(LikhonIme.this::forceHideVoice, 2600);
+            }
+        }
+
+        @Override
+        public void onOfflineStopped() {
+            offlineActive = false;
+            if (voiceListening) {
+                onVoiceStopped();
+            } else {
+                forceHideVoice();
+            }
+            if (offlineVoice != null) {
+                offlineVoice.releaseIdle();
+            }
+        }
+    };
+
+    /** Hides the voice strip without touching a running recogniser. */
+    private void forceHideVoice() {
+        if (offlineActive || voiceListening) {
+            return;
+        }
+        voiceListening = false;
+        voicePreviewing = false;
+        offlineActive = false;
+        resetVoiceLevel();
+        if (keyboardView != null) {
+            keyboardView.setVoiceActive(false);
+        }
+        if (voicePanel != null) {
+            voicePanel.setVisibility(View.GONE);
+        }
+        lastSuggestionKey = "";
+        updateSuggestions();
     }
 
     /** Opens the phone's speech screen (Google voice) and inserts its result. */
@@ -2066,6 +2243,21 @@ public class LikhonIme extends InputMethodService
     private void stopVoice(boolean cancel) {
         if (uiHandler != null) {
             uiHandler.removeCallbacks(voiceScreenFallback);
+        }
+        if (offlineActive) {
+            if (offlineVoice != null) {
+                if (cancel) {
+                    offlineVoice.cancel();
+                } else {
+                    offlineVoice.stop();
+                }
+            }
+            if (cancel) {
+                offlineActive = false;
+                voiceListening = false;
+                forceHideVoice();
+            }
+            return;
         }
         if (voice != null) {
             if (cancel) {
@@ -2132,7 +2324,12 @@ public class LikhonIme extends InputMethodService
         }
         voiceLangOverride = null;
         updateVoiceLabels();
-        if (voiceListening && voice != null) {
+        if (voiceListening && offlineActive && offlineVoice != null) {
+            offlineVoice.restart(voiceLanguage(), prefs.voiceContinuous());
+            if (voiceStatus != null) {
+                voiceStatus.setText(R.string.voice_offline_loading);
+            }
+        } else if (voiceListening && voice != null) {
             // Apply the new language to the running session immediately.
             voice.cancel();
             voice.start(voiceLanguage(), prefs.voiceContinuous());
@@ -2447,6 +2644,18 @@ public class LikhonIme extends InputMethodService
             voicePanel.setVisibility(View.VISIBLE);
         }
         VoiceLog.add("stopped: " + VoiceInput.errorName(code));
+        if (Prefs.VOICE_MODE_AUTO.equals(prefs.voiceMode()) && !voiceGotText
+                && VoiceModels.selected(this) != null) {
+            // The phone's recogniser gave up, but a downloaded model can still
+            // take the dictation — and it never needs a connection.
+            VoiceLog.add("online failed, using offline model");
+            if (voice != null) {
+                voice.destroy();
+                voice = null;
+            }
+            startOfflineVoice();
+            return;
+        }
         if (Prefs.VOICE_MODE_AUTO.equals(prefs.voiceMode()) && !voiceGotText) {
             // The phone's recogniser gave up on the keyboard: use its own
             // speech screen rather than leaving the user with no voice at all.
@@ -2476,6 +2685,11 @@ public class LikhonIme extends InputMethodService
         }
         if (voicePanel != null) {
             voicePanel.setVisibility(View.GONE);
+        }
+        if (VoiceModels.selected(this) != null) {
+            VoiceLog.add("no speech service, using offline model");
+            startOfflineVoice();
+            return;
         }
         if (Prefs.VOICE_MODE_AUTO.equals(prefs.voiceMode())) {
             VoiceLog.add("unavailable inline, opening voice screen");

@@ -10,8 +10,8 @@ android {
         applicationId 'com.likhon.keyboard'
         minSdk 23
         targetSdk 34
-        versionCode 24
-        versionName '2.1'
+        versionCode 25
+        versionName '2.2'
         resourceConfigurations += ['en', 'bn']
     }
 
