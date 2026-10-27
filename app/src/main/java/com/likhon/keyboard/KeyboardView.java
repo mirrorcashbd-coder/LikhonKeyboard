@@ -351,19 +351,19 @@ public class KeyboardView extends View {
                 continue;
             }
             rowFill[r] = new LinearGradient(0, top, 0, bottom,
-                    ((dark ? 0x22 : 0xAE) << 24) | 0x00FFFFFF,
-                    ((dark ? 0x0D : 0x78) << 24) | 0x00FFFFFF,
+                    ((dark ? 0x18 : 0x40) << 24) | 0x00FFFFFF,
+                    ((dark ? 0x0A : 0x24) << 24) | 0x00FFFFFF,
                     Shader.TileMode.CLAMP);
             rowFillSpecial[r] = new LinearGradient(0, top, 0, bottom,
-                    ((dark ? 0x28 : 0x18) << 24) | 0x00000000,
-                    ((dark ? 0x14 : 0x0A) << 24) | 0x00000000,
+                    ((dark ? 0x20 : 0x1A) << 24) | 0x00000000,
+                    ((dark ? 0x10 : 0x0C) << 24) | 0x00000000,
                     Shader.TileMode.CLAMP);
             rowGloss[r] = new LinearGradient(0, top, 0, top + (bottom - top) * 0.6f,
-                    ((dark ? 0x16 : 0x3C) << 24) | 0x00FFFFFF, 0x00000000,
+                    ((dark ? 0x14 : 0x28) << 24) | 0x00FFFFFF, 0x00000000,
                     Shader.TileMode.CLAMP);
             rowRim[r] = new LinearGradient(0, top, 0, bottom, dark
-                    ? new int[]{0x8CFFFFFF, 0x2AFFFFFF, 0x1AFFFFFF, 0x55FFFFFF}
-                    : new int[]{0xFFFFFFFF, 0xC2FFFFFF, 0xA4FFFFFF, 0xE8FFFFFF},
+                    ? new int[]{0x9AFFFFFF, 0x3AFFFFFF, 0x28FFFFFF, 0x66FFFFFF}
+                    : new int[]{0xFFFFFFFF, 0xDCFFFFFF, 0xC8FFFFFF, 0xF6FFFFFF},
                     null, Shader.TileMode.CLAMP);
         }
     }
@@ -457,7 +457,15 @@ public class KeyboardView extends View {
         canvas.drawRoundRect(r, radius, radius, glossPaint);
         glossPaint.setShader(null);
 
-        // specular rim, bright at the top and softer at the bottom
+        // a soft ring of light just inside the edge, then the bright hairline
+        rimPaint.setShader(null);
+        rimPaint.setStrokeWidth(dp(3.4f));
+        rimPaint.setColor(((palette.dark ? 0x1E : 0x26) << 24) | 0x00FFFFFF);
+        tmpRect.set(r);
+        tmpRect.inset(dp(1.7f), dp(1.7f));
+        canvas.drawRoundRect(tmpRect, Math.max(1f, radius - dp(1.7f)),
+                Math.max(1f, radius - dp(1.7f)), rimPaint);
+
         Shader rim = shaderFor(rowRim, row);
         if (rim != null) {
             strokePaint.setShader(rim);
@@ -593,6 +601,8 @@ public class KeyboardView extends View {
         int codePoint = label.codePointAt(0);
         boolean emoji = codePoint >= 0x1F000;
         textPaint.setColor(color);
+        textPaint.setShadowLayer(dp(2.6f), 0, dp(0.9f),
+                palette.dark ? 0xA0000000 : 0x70000000);
         float size = r.height() * (emoji ? 0.5f : 0.44f) * scale * labelScale;
         if (!emoji && label.length() > 1) {
             size *= label.length() >= 4 ? 0.58f : 0.74f;
@@ -626,6 +636,8 @@ public class KeyboardView extends View {
             return;
         }
         textPaint.setColor(palette.textMuted);
+        textPaint.setShadowLayer(dp(2.6f), 0, dp(0.9f),
+                palette.dark ? 0xA0000000 : 0x70000000);
         textPaint.setTextSize(r.height() * 0.24f);
         Paint.FontMetrics fm = textPaint.getFontMetrics();
         canvas.drawText(label, r.centerX(), r.centerY() - (fm.ascent + fm.descent) / 2f, textPaint);

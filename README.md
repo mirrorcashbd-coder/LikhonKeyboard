@@ -341,12 +341,19 @@ every setting to its default without touching the clipboard.
 
 ## Design
 
-The keyboard itself is glass too: every key is a translucent cap with a top
-sheen, a specular rim, a soft drop shadow and a live press animation — the key
-springs down under the finger, a wave of accent light spreads out from the
-touch point, and a slow sheen sweeps across the whole keyboard. Behind
-everything sits the same four-blob colour mesh, so the toolbar, the suggestion
-strip, the panels and the keys all read as clear glass over colour.
+The whole app floats on **your own wallpaper**: it is read once, shrunk to a
+few hundred pixels, blurred with three cheap box passes and stretched over the
+screen, so the background is a soft, colourful photo exactly like iOS 27
+liquid glass. When the wallpaper cannot be read, a four-blob colour mesh
+derived from the accent takes its place.
+
+The keyboard is glass too: every key is a translucent cap with a top sheen, a
+ring of light caught inside the edge, a bright specular hairline, a soft drop
+shadow and a live press animation — the key springs down under the finger, a
+wave of accent light spreads out from the touch point, and a slow sheen sweeps
+across the whole keyboard. Toolbar, suggestion chips, panels and circular icon
+badges are the same glass, and text carries a soft shadow so it stays crisp on
+any wallpaper.
 
 Every settings screen is built from **liquid glass**: translucent panels with a
 diagonal specular rim, a top sheen, a hairline bright edge and a soft elevation
@@ -428,6 +435,18 @@ with the current theme. Every tap plays a short squash-and-settle animation and
 undo/redo pivot to show the way the history moved.
 
 ## Changes
+
+**1.19**
+
+- The phone's wallpaper is now the real backdrop: read once, blurred in
+  software and stretched behind every screen and the keyboard, with a theme
+  wash so text stays readable.
+- Glass rebuilt to match iOS 27 liquid glass: far more transparent panels, a
+  ring of light trapped inside each edge, and a bright specular hairline.
+- Circular glass icon badges on quick tiles and navigation rows.
+- Soft text shadows on keys, labels and section headings so they read on any
+  wallpaper.
+- Colour mesh kept as the fallback when the wallpaper cannot be read.
 
 **1.18**
 

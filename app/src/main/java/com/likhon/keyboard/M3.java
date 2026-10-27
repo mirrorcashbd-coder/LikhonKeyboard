@@ -204,6 +204,8 @@ final class M3 {
 
     static TextView sectionLabel(Context c, Palette p, CharSequence text) {
         TextView label = Ui.text(c, text, 12, p.textMuted, true);
+        label.setShadowLayer(dp(c, 3f), 0, dp(c, 1f),
+                p.dark ? 0x99000000 : 0x88FFFFFF);
         label.setLetterSpacing(0.09f);
         label.setAllCaps(false);
         label.setPadding(dp(c, 8), dp(c, 22), 0, dp(c, 8));
@@ -367,7 +369,7 @@ final class M3 {
 
         LinearLayout content = Ui.vertical(c);
         FrameLayout badge = new FrameLayout(c);
-        badge.setBackground(Glass.glass(c, p, 13, 0));
+        badge.setBackground(Glass.glass(c, p, 20, 0));
         badge.setElevation(dp(c, 1));
         badge.addView(icon(c, iconRes, p.accent),
                 new FrameLayout.LayoutParams(dp(c, 21), dp(c, 21), Gravity.CENTER));
@@ -402,7 +404,7 @@ final class M3 {
         row.setPadding(dp(c, 12), dp(c, 12), dp(c, 10), dp(c, 12));
 
         FrameLayout badge = new FrameLayout(c);
-        badge.setBackground(Glass.glass(c, p, 11, 0));
+        badge.setBackground(Glass.glass(c, p, 17, 0));
         badge.addView(icon(c, iconRes, p.accent),
                 new FrameLayout.LayoutParams(dp(c, 19), dp(c, 19), Gravity.CENTER));
         LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(

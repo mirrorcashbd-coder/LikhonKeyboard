@@ -555,7 +555,7 @@ public class LikhonIme extends InputMethodService
                 : (prefs.labelSize() == 2 ? 1.09f : 1f));
         styleVoicePanel();
         if (rootView != null) {
-            rootView.setBackground(new Glass.BackdropDrawable(palette));
+            rootView.setBackground(new Glass.BackdropDrawable(this, palette));
         }
         if (resizeHandle != null) {
             resizeHandle.setBackgroundColor(Color.TRANSPARENT);

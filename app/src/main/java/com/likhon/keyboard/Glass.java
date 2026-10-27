@@ -1,6 +1,7 @@
 package com.likhon.keyboard;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
 import android.graphics.Color;
@@ -37,7 +38,9 @@ final class Glass {
 
     private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint glossPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint tintPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint rimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Shader rimShader;
     private final RectF rect = new RectF();
     private final Palette palette;
     private final float radiusPx;
@@ -65,10 +68,30 @@ final class Glass {
         float r = Math.min(radiusPx, Math.min(w, h) / 2f);
         rect.set(0, 0, w, h);
         canvas.drawRoundRect(rect, r, r, fillPaint);
+        canvas.drawRoundRect(rect, r, r, tintPaint);
         canvas.drawRoundRect(rect, r, r, glossPaint);
-        float inset = strokePx / 2f;
+
+        // Light caught inside the edge of the glass: a few soft rings that get
+        // brighter as they approach the rim, like a drop of water.
+        rimPaint.setShader(null);
+        int halo = palette.dark ? 0x2E : 0x34;
+        for (int ring = 3; ring >= 1; ring--) {
+            float width = strokePx * 2f * ring;
+            rimPaint.setStrokeWidth(width);
+            rimPaint.setColor(((halo / ring) << 24) | 0x00FFFFFF);
+            float inset = width / 2f;
+            rect.set(inset, inset, w - inset, h - inset);
+            canvas.drawRoundRect(rect, Math.max(1f, r - inset),
+                    Math.max(1f, r - inset), rimPaint);
+        }
+
+        // The bright hairline that defines the edge.
+        rimPaint.setShader(rimShader);
+        rimPaint.setStrokeWidth(strokePx * 1.15f);
+        float inset = strokePx * 0.58f;
         rect.set(inset, inset, w - inset, h - inset);
-        canvas.drawRoundRect(rect, r, r, rimPaint);
+        canvas.drawRoundRect(rect, Math.max(1f, r - inset),
+                Math.max(1f, r - inset), rimPaint);
     }
 
     private void build(float w, float h) {
@@ -76,23 +99,26 @@ final class Glass {
         builtH = h;
         boolean dark = palette.dark;
 
-        int topAlpha = dark ? (kind == BAR ? 0x30 : 0x1E)
-                : (kind == BAR ? 0xC8 : 0xA8);
-        int bottomAlpha = dark ? (kind == BAR ? 0x1C : 0x0E)
-                : (kind == BAR ? 0xAA : 0x82);
+        int topAlpha = dark ? (kind == BAR ? 0x2C : 0x1C)
+                : (kind == BAR ? 0x7A : 0x58);
+        int bottomAlpha = dark ? (kind == BAR ? 0x18 : 0x0C)
+                : (kind == BAR ? 0x5C : 0x3A);
         fillPaint.setShader(new LinearGradient(0, 0, 0, h,
                 (topAlpha << 24) | 0x00FFFFFF, (bottomAlpha << 24) | 0x00FFFFFF,
                 Shader.TileMode.CLAMP));
 
-        int glossAlpha = dark ? 0x1A : 0x44;
+        int glossAlpha = dark ? 0x16 : 0x2A;
         glossPaint.setShader(new LinearGradient(0, 0, 0, h * 0.68f,
                 (glossAlpha << 24) | 0x00FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
 
         int[] rimColors = dark
-                ? new int[]{0x7CFFFFFF, 0x26FFFFFF, 0x1AFFFFFF, 0x4CFFFFFF}
-                : new int[]{0xFFFFFFFF, 0xB6FFFFFF, 0x9CFFFFFF, 0xE8FFFFFF};
-        rimPaint.setShader(new LinearGradient(0, 0, w, h, rimColors, null,
-                Shader.TileMode.CLAMP));
+                ? new int[]{0x8CFFFFFF, 0x30FFFFFF, 0x24FFFFFF, 0x5CFFFFFF}
+                : new int[]{0xFFFFFFFF, 0xD2FFFFFF, 0xBAFFFFFF, 0xF4FFFFFF};
+        rimShader = new LinearGradient(0, 0, w, h, rimColors, null,
+                Shader.TileMode.CLAMP);
+        rimPaint.setShader(rimShader);
+
+        tintPaint.setColor(((dark ? 0x16 : 0x12) << 24) | (palette.accent & 0x00FFFFFF));
     }
 
     // ------------------------------------------------------------- backdrops
@@ -104,13 +130,17 @@ final class Glass {
      * without a real blur pass.
      */
     static final class BackdropPainter {
+        private final Context context;
         private final Palette palette;
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint photoPaint = new Paint(Paint.ANTI_ALIAS_FLAG
+                | Paint.FILTER_BITMAP_FLAG);
         private Shader base;
         private float builtW = -1;
         private float builtH = -1;
 
-        BackdropPainter(Palette palette) {
+        BackdropPainter(Context context, Palette palette) {
+            this.context = context;
             this.palette = palette;
         }
 
@@ -128,15 +158,33 @@ final class Glass {
             canvas.drawRect(0, 0, w, h, paint);
             paint.setShader(null);
 
+            Bitmap photo = Wallpaper.blurred(context);
+            if (photo != null && !photo.isRecycled()) {
+                float scale = Math.max(w / (float) photo.getWidth(),
+                        h / (float) photo.getHeight());
+                canvas.save();
+                canvas.translate((w - photo.getWidth() * scale) / 2f,
+                        (h - photo.getHeight() * scale) / 2f);
+                canvas.scale(scale, scale);
+                canvas.drawBitmap(photo, 0, 0, photoPaint);
+                canvas.restore();
+
+                // A theme wash over the photo: white for light themes, black
+                // for dark ones, so labels stay readable on any wallpaper.
+                paint.setColor(((palette.dark ? 0x52 : 0x60) << 24)
+                        | (palette.dark ? 0x000000 : 0xFFFFFF));
+                canvas.drawRect(0, 0, w, h, paint);
+            }
+
             int accent = palette.accent;
             blob(canvas, w * 0.94f, -h * 0.02f, w * 1.05f, accent,
-                    palette.dark ? 0x54 : 0x44);
+                    palette.dark ? 0x4A : 0x32);
             blob(canvas, -w * 0.10f, h * 0.44f, w * 1.10f, shiftHue(accent, 46f),
-                    palette.dark ? 0x3A : 0x30);
+                    palette.dark ? 0x30 : 0x24);
             blob(canvas, w * 0.45f, h * 1.04f, w * 1.00f, shiftHue(accent, -58f),
-                    palette.dark ? 0x30 : 0x26);
+                    palette.dark ? 0x28 : 0x1C);
             blob(canvas, w * 0.22f, h * 0.01f, w * 0.66f, 0xFFFFFF,
-                    palette.dark ? 0x18 : 0x64);
+                    palette.dark ? 0x16 : 0x3A);
         }
 
         private void blob(Canvas canvas, float cx, float cy, float radius, int color,
@@ -163,7 +211,7 @@ final class Glass {
 
         Backdrop(Context context, Palette palette) {
             super(context);
-            painter = new BackdropPainter(palette);
+            painter = new BackdropPainter(context, palette);
             setWillNotDraw(false);
         }
 
@@ -177,8 +225,8 @@ final class Glass {
     static final class BackdropDrawable extends Drawable {
         private final BackdropPainter painter;
 
-        BackdropDrawable(Palette palette) {
-            painter = new BackdropPainter(palette);
+        BackdropDrawable(Context context, Palette palette) {
+            painter = new BackdropPainter(context, palette);
         }
 
         @Override
@@ -256,18 +304,18 @@ final class Glass {
         int top;
         int bottom;
         if (tint != 0) {
-            top = ((p.dark ? 0xF0 : 0xF6) << 24)
+            top = ((p.dark ? 0xE8 : 0xF0) << 24)
                     | (Palette.mix(tint, 0xFFFFFF, p.dark ? 0.20f : 0.14f) & 0x00FFFFFF);
-            bottom = ((p.dark ? 0xDA : 0xE6) << 24) | (tint & 0x00FFFFFF);
+            bottom = ((p.dark ? 0xCE : 0xDC) << 24) | (tint & 0x00FFFFFF);
         } else {
-            top = ((p.dark ? 0x2A : 0xC8) << 24) | 0x00FFFFFF;
-            bottom = ((p.dark ? 0x16 : 0xA2) << 24) | 0x00FFFFFF;
+            top = ((p.dark ? 0x26 : 0x58) << 24) | 0x00FFFFFF;
+            bottom = ((p.dark ? 0x11 : 0x36) << 24) | 0x00FFFFFF;
         }
         GradientDrawable drawable = new GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM, new int[]{top, bottom});
         drawable.setCornerRadius(Ui.dp(c, radiusDp));
         drawable.setStroke(Math.max(1, Ui.dp(c, 1.1f)),
-                ((p.dark ? 0x5C : 0xEE) << 24) | 0x00FFFFFF);
+                ((p.dark ? 0x62 : 0xE8) << 24) | 0x00FFFFFF);
         return drawable;
     }
 
@@ -276,10 +324,16 @@ final class Glass {
         GradientDrawable base = fill(c, p, radiusDp, tint);
         GradientDrawable sheen = new GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{(p.dark ? 0x16 : 0x3A) << 24 | 0x00FFFFFF, 0x00FFFFFF});
+                new int[]{(p.dark ? 0x14 : 0x28) << 24 | 0x00FFFFFF, 0x00FFFFFF});
         sheen.setCornerRadius(Ui.dp(c, Math.max(1f, radiusDp - 1f)));
-        LayerDrawable layers = new LayerDrawable(new Drawable[]{base, sheen});
+        GradientDrawable halo = new GradientDrawable();
+        halo.setColor(0x00000000);
+        halo.setCornerRadius(Ui.dp(c, Math.max(1f, radiusDp - 2f)));
+        halo.setStroke(Math.max(1, Ui.dp(c, 2.4f)),
+                ((p.dark ? 0x22 : 0x2A) << 24) | 0x00FFFFFF);
+        LayerDrawable layers = new LayerDrawable(new Drawable[]{base, sheen, halo});
         layers.setLayerInset(1, Ui.dp(c, 1), Ui.dp(c, 1), Ui.dp(c, 1), Ui.dp(c, 1));
+        layers.setLayerInset(2, Ui.dp(c, 1), Ui.dp(c, 1), Ui.dp(c, 1), Ui.dp(c, 1));
         GradientDrawable mask = Ui.rounded(c, 0xFFFFFFFF, radiusDp);
         return new RippleDrawable(ColorStateList.valueOf(rippleColor), layers, mask);
     }
@@ -289,10 +343,16 @@ final class Glass {
         GradientDrawable base = fill(c, p, radiusDp, tint);
         GradientDrawable sheen = new GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{(p.dark ? 0x16 : 0x3A) << 24 | 0x00FFFFFF, 0x00FFFFFF});
+                new int[]{(p.dark ? 0x14 : 0x28) << 24 | 0x00FFFFFF, 0x00FFFFFF});
         sheen.setCornerRadius(Ui.dp(c, Math.max(1f, radiusDp - 1f)));
-        LayerDrawable layers = new LayerDrawable(new Drawable[]{base, sheen});
+        GradientDrawable halo = new GradientDrawable();
+        halo.setColor(0x00000000);
+        halo.setCornerRadius(Ui.dp(c, Math.max(1f, radiusDp - 2f)));
+        halo.setStroke(Math.max(1, Ui.dp(c, 2.4f)),
+                ((p.dark ? 0x22 : 0x2A) << 24) | 0x00FFFFFF);
+        LayerDrawable layers = new LayerDrawable(new Drawable[]{base, sheen, halo});
         layers.setLayerInset(1, Ui.dp(c, 1), Ui.dp(c, 1), Ui.dp(c, 1), Ui.dp(c, 1));
+        layers.setLayerInset(2, Ui.dp(c, 1), Ui.dp(c, 1), Ui.dp(c, 1), Ui.dp(c, 1));
         return layers;
     }
 }
