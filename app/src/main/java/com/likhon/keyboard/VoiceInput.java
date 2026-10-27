@@ -1,7 +1,9 @@
 package com.likhon.keyboard;
 
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ResolveInfo;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -11,6 +13,7 @@ import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Thin, restartable wrapper around {@link SpeechRecognizer}.
@@ -59,6 +62,10 @@ final class VoiceInput implements RecognitionListener {
     private SpeechRecognizer recognizer;
     private int startFailures;
     private boolean onDevice;
+    /** Engine candidates: null first (the phone's default), then every service found. */
+    private final List<ComponentName> engines = new ArrayList<>();
+    private int engineIndex;
+    private int consecutiveFailures;
     private boolean wantListening;
     private boolean continuous;
     private String language = "bn-BD";
@@ -124,6 +131,9 @@ final class VoiceInput implements RecognitionListener {
         this.language = languageTag == null || languageTag.isEmpty() ? "bn-BD" : languageTag;
         this.continuous = continuous;
         this.onDevice = false;
+        this.consecutiveFailures = 0;
+        this.engineIndex = 0;
+        buildEngines();
         this.wantListening = true;
         VoiceLog.add("start " + this.language + (continuous ? ", continuous" : ""));
         this.lastPartial = "";
@@ -147,8 +157,15 @@ final class VoiceInput implements RecognitionListener {
                             context.getApplicationContext());
                 } else {
                     onDevice = false;
-                    recognizer = SpeechRecognizer.createSpeechRecognizer(
-                            context.getApplicationContext());
+                    ComponentName engine = engineIndex > 0 && engineIndex <= engines.size()
+                            ? engines.get(engineIndex - 1) : null;
+                    if (engine == null) {
+                        recognizer = SpeechRecognizer.createSpeechRecognizer(
+                                context.getApplicationContext());
+                    } else {
+                        recognizer = SpeechRecognizer.createSpeechRecognizer(
+                                context.getApplicationContext(), engine);
+                    }
                 }
                 recognizer.setRecognitionListener(this);
             } catch (RuntimeException e) {
@@ -179,6 +196,52 @@ final class VoiceInput implements RecognitionListener {
             }
             handler.postDelayed(restart, RESTART_DELAY_MS);
         }
+    }
+
+    /**
+     * Lists the recognisers actually installed. Some phones ship a stub as the
+     * default service while a working one (usually Google's) sits next to it;
+     * with this list the wrapper can move on instead of retrying a dead engine.
+     */
+    private void buildEngines() {
+        engines.clear();
+        try {
+            String defaultName = android.provider.Settings.Secure.getString(
+                    context.getContentResolver(), "voice_recognition_service");
+            VoiceLog.add("default engine: " + (defaultName == null ? "(none)" : defaultName));
+            List<ResolveInfo> found = context.getPackageManager().queryIntentServices(
+                    new Intent(android.speech.RecognitionService.SERVICE_INTERFACE), 0);
+            if (found != null) {
+                for (ResolveInfo info : found) {
+                    if (info.serviceInfo == null) {
+                        continue;
+                    }
+                    ComponentName name = new ComponentName(
+                            info.serviceInfo.packageName, info.serviceInfo.name);
+                    boolean duplicate = name.flattenToString().equals(defaultName);
+                    if (!duplicate) {
+                        engines.add(name);
+                    }
+                    VoiceLog.add("engine found: " + name.flattenToShortString()
+                            + (info.serviceInfo.enabled ? "" : " (disabled)")
+                            + (duplicate ? " (default)" : ""));
+                }
+            }
+        } catch (RuntimeException e) {
+            VoiceLog.add("engine list failed: " + e);
+        }
+    }
+
+    /** Moves to the next recogniser; false when there is none left. */
+    private boolean nextEngine() {
+        int total = engines.size() + 1;
+        if (engineIndex + 1 >= total) {
+            return false;
+        }
+        engineIndex++;
+        ComponentName name = engineIndex >= 1 ? engines.get(engineIndex - 1) : null;
+        VoiceLog.add("engine -> " + (name == null ? "default" : name.flattenToShortString()));
+        return true;
     }
 
     private Intent intent() {
@@ -302,7 +365,25 @@ final class VoiceInput implements RecognitionListener {
                 || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
                 || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
                 || error == SpeechRecognizer.ERROR_CLIENT;
+        boolean engineProblem = error == SpeechRecognizer.ERROR_CLIENT
+                || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
+                || error == SpeechRecognizer.ERROR_AUDIO
+                || error == SpeechRecognizer.ERROR_SERVER
+                || error == SpeechRecognizer.ERROR_NETWORK
+                || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT
+                || error == SpeechRecognizer.ERROR_SERVER_DISCONNECTED
+                || error == SpeechRecognizer.ERROR_TOO_MANY_REQUESTS;
         if (recoverable) {
+            if (engineProblem) {
+                consecutiveFailures++;
+                if (consecutiveFailures >= 2 && nextEngine()) {
+                    consecutiveFailures = 0;
+                    destroyRecognizer();
+                    listener.onVoiceHint(error);
+                    handler.postDelayed(restart, RESTART_DELAY_MS);
+                    return;
+                }
+            }
             listener.onVoiceHint(error);
             if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
                     || error == SpeechRecognizer.ERROR_CLIENT) {
@@ -323,6 +404,7 @@ final class VoiceInput implements RecognitionListener {
 
     @Override
     public void onResults(Bundle results) {
+        consecutiveFailures = 0;
         String text = best(results);
         VoiceLog.add("result: " + (text.isEmpty() ? "(empty)" : shorten(text)));
         if (!text.isEmpty()) {

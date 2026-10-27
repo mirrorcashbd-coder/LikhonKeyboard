@@ -55,6 +55,7 @@ public class LikhonIme extends InputMethodService
     private View voiceLevel;
     private LinearLayout.LayoutParams voiceLevelParams;
     private int voiceMisses;
+    private int voiceEngineErrors;
     private boolean voiceHelpShown;
     private boolean voiceOnDeviceTried;
     /** Language tried after Bangla (India) when bn-BD hears nothing. */
@@ -789,6 +790,7 @@ public class LikhonIme extends InputMethodService
         voicePreviewing = false;
         voiceListening = true;
         voiceMisses = 0;
+        voiceEngineErrors = 0;
         voiceHelpShown = false;
         voiceOnDeviceTried = false;
         voiceLangOverride = null;
@@ -1099,6 +1101,9 @@ public class LikhonIme extends InputMethodService
             }
         } else {
             voiceMisses = 0;
+            if (code != SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
+                voiceEngineErrors++;
+            }
         }
         voiceStatus.setText(voiceHintText(code));
     }
@@ -1129,7 +1134,10 @@ public class LikhonIme extends InputMethodService
 
     /** Android's own offline model, when the phone's speech service stays mute. */
     private boolean tryOnDeviceFallback() {
-        if (voiceOnDeviceTried || voiceMisses < 4 || voice == null) {
+        if (voiceOnDeviceTried || voice == null) {
+            return false;
+        }
+        if (voiceMisses < 4 && voiceEngineErrors < 2) {
             return false;
         }
         if (!VoiceInput.onDeviceAvailable(this)) {

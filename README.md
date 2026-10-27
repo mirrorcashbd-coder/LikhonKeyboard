@@ -6,14 +6,14 @@ no AndroidX, no third-party libraries, no ads, and nothing of its own ever goes
 online (the `INTERNET` permission is declared only for speech services that run
 inside the calling app).
 
-**APK:** `build/manual/LikhonKeyboard-1.7.apk` (also copied to
-`/sdcard/Download/LikhonKeyboard-1.7.apk`)
+**APK:** `build/manual/LikhonKeyboard-1.8.apk` (also copied to
+`/sdcard/Download/LikhonKeyboard-1.8.apk`)
 
 ---
 
 ## Install
 
-1. Open `LikhonKeyboard-1.7.apk` in the Files app and allow "install unknown apps"
+1. Open `LikhonKeyboard-1.8.apk` in the Files app and allow "install unknown apps"
    for that app if asked.
 2. Open **Likhon Keyboard** from the app drawer.
 3. Tap **Enable keyboard** → turn on "Likhon Keyboard".
@@ -205,7 +205,7 @@ equivalent ARM64 build script is included. It uses the Ubuntu/Debian
 tools/build-apk-arm64.sh
 ```
 
-Output: `build/manual/LikhonKeyboard-1.7.apk` (signed with the debug key in
+Output: `build/manual/LikhonKeyboard-1.8.apk` (signed with the debug key in
 `keystore/likhon-debug.jks`, generated on first run — keep that file if you want
 future builds to install over the current one).
 
@@ -254,6 +254,17 @@ finger (key, long-press timer, delete-repeat timer), which is what allows
 simultaneous presses.
 
 ## Changes
+
+**1.8**
+
+- The voice wrapper now lists every recognition service installed on the phone
+  (the default one plus the others it can see) and moves to the next engine
+  when one answers with CLIENT/BUSY instead of retrying it forever. Phones whose
+  default service is a stub can therefore still reach a working engine.
+- Android's on-device recogniser is tried after two engine errors, not only
+  after four silent phrases, so a service that refuses an input method is
+  detected quickly.
+- Each engine, its package and its enabled state are written to the voice log.
 
 **1.7**
 

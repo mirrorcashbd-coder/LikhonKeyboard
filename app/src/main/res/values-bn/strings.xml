@@ -45,7 +45,7 @@
 
     <string name="section_about">সম্পর্কে</string>
     <string name="about_body">লিখন একটি ছোট, অফলাইন কীবোর্ড। এতে বিজ্ঞাপন নেই এবং কোথাও কিছু পাঠায় না; মাইক্রোফোন কেবল ভয়েস টাইপিংয়ে ব্যবহার হয়। ইংরেজি সাধারণ QWERTY লেআউট; বাংলা ফোনেটিক, অর্থাৎ ইংরেজি অক্ষরে যেভাবে উচ্চারণ হয় সেভাবে লিখলেই বাংলা হয়।</string>
-    <string name="about_version">সংস্করণ ১.৭</string>
+    <string name="about_version">সংস্করণ ১.৮</string>
     <string name="footer">অফলাইন · বিজ্ঞাপন নেই · মাইক অনুমতি ঐচ্ছিক</string>
     <string name="about_guide">বাংলা টাইপিং নির্দেশিকা</string>
 
