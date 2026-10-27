@@ -18,6 +18,7 @@ final class Key {
     static final int PREV = 9;
     static final int NEXT = 10;
     static final int MORE = 11;
+    static final int MIC = 12;
 
     final int type;
     /** What is drawn on the key. Also the text committed for CHAR keys. */

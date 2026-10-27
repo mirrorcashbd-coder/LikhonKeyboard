@@ -64,6 +64,7 @@ public class KeyboardView extends View {
     private float rowHeightPx;
     private boolean haptic = true;
     private boolean sound = false;
+    private boolean voiceActive;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private AudioManager audioManager;
@@ -165,6 +166,14 @@ public class KeyboardView extends View {
     void setFeedback(boolean haptic, boolean sound) {
         this.haptic = haptic;
         this.sound = sound;
+    }
+
+    /** Lights the microphone key while voice typing is listening. */
+    void setVoiceActive(boolean active) {
+        if (this.voiceActive != active) {
+            this.voiceActive = active;
+            invalidate();
+        }
     }
 
     void setRowHeightDp(float rowHeightDp) {
@@ -279,8 +288,9 @@ public class KeyboardView extends View {
     }
 
     private void drawKey(Canvas canvas, Key key, RectF r, boolean pressed) {
+        boolean accent = key.active || (key.type == Key.MIC && voiceActive);
         int bg;
-        if (key.active) {
+        if (accent) {
             bg = pressed ? palette.accentPressed : palette.accent;
         } else if (key.isSpecial()) {
             bg = pressed ? palette.keySpecialPressed : palette.keySpecial;
@@ -299,7 +309,7 @@ public class KeyboardView extends View {
             canvas.drawRoundRect(tmpRect, radius, radius, strokePaint);
         }
 
-        int foreground = key.active ? palette.onAccent : palette.text;
+        int foreground = accent ? palette.onAccent : palette.text;
         switch (key.type) {
             case Key.SHIFT:
                 drawShift(canvas, r, foreground, "caps".equals(key.label));
@@ -316,6 +326,9 @@ public class KeyboardView extends View {
                 break;
             case Key.EMOJI:
                 drawEmojiIcon(canvas, r, foreground);
+                break;
+            case Key.MIC:
+                drawMic(canvas, r, foreground);
                 break;
             case Key.PREV:
                 drawChevron(canvas, r, foreground, true);
@@ -451,6 +464,25 @@ public class KeyboardView extends View {
         iconPath.moveTo(cx - s * 0.95f, cy + s * 0.45f);
         iconPath.lineTo(cx - s * 0.38f, cy + s);
         canvas.drawPath(iconPath, iconPaint);
+    }
+
+    private void drawMic(Canvas canvas, RectF r, int color) {
+        float cx = r.centerX();
+        float cy = r.centerY();
+        float s = Math.min(r.width(), r.height()) * 0.19f;
+        iconPaint.setStyle(Paint.Style.STROKE);
+        iconPaint.setStrokeWidth(dp(1.7f));
+        iconPaint.setStrokeCap(Paint.Cap.ROUND);
+        iconPaint.setColor(color);
+        // Capsule body.
+        tmpRect.set(cx - s * 0.5f, cy - s * 1.45f, cx + s * 0.5f, cy + s * 0.2f);
+        canvas.drawRoundRect(tmpRect, s * 0.5f, s * 0.5f, iconPaint);
+        // Cradle, stem and base.
+        tmpRect.set(cx - s, cy - s * 0.55f, cx + s, cy + s * 0.85f);
+        canvas.drawArc(tmpRect, 0f, 180f, false, iconPaint);
+        canvas.drawLine(cx, cy + s * 0.85f, cx, cy + s * 1.3f, iconPaint);
+        canvas.drawLine(cx - s * 0.65f, cy + s * 1.3f,
+                cx + s * 0.65f, cy + s * 1.3f, iconPaint);
     }
 
     private void drawEmojiIcon(Canvas canvas, RectF r, int color) {

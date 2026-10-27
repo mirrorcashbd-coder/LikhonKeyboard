@@ -15,6 +15,13 @@ final class Prefs {
     static final String KEY_SOUND = "sound";
     static final String KEY_AUTOCAP = "autocap";
     static final String KEY_HINTS = "hints";
+    static final String KEY_VOICE_LANG = "voice_lang";
+    static final String KEY_VOICE_BANGLISH = "voice_banglish";
+    static final String KEY_VOICE_CONTINUOUS = "voice_continuous";
+    static final String KEY_VOICE_CLEANUP = "voice_cleanup";
+
+    /** Voice language follows the typing language. */
+    static final String VOICE_AUTO = "auto";
 
     static final int THEME_SYSTEM = 0;
     static final int THEME_LIGHT = 1;
@@ -60,6 +67,26 @@ final class Prefs {
 
     boolean hints() {
         return sp.getBoolean(KEY_HINTS, true);
+    }
+
+    String voiceLang() {
+        return sp.getString(KEY_VOICE_LANG, VOICE_AUTO);
+    }
+
+    void setVoiceLang(String value) {
+        sp.edit().putString(KEY_VOICE_LANG, value).apply();
+    }
+
+    boolean voiceBanglish() {
+        return sp.getBoolean(KEY_VOICE_BANGLISH, false);
+    }
+
+    boolean voiceContinuous() {
+        return sp.getBoolean(KEY_VOICE_CONTINUOUS, true);
+    }
+
+    boolean voiceCleanup() {
+        return sp.getBoolean(KEY_VOICE_CLEANUP, true);
     }
 
     boolean getBoolean(String key, boolean fallback) {

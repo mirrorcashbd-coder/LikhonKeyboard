@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Voice typing only. Recognition itself is done by the phone's speech
+         service; this app never connects to the network. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"

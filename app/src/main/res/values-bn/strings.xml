@@ -6,7 +6,7 @@
     <string name="subtype_english">English</string>
     <string name="subtype_bangla">বাংলা (ফোনেটিক)</string>
 
-    <string name="tagline">দ্রুত ইংরেজি ও ফোনেটিক বাংলা টাইপিং। অফলাইন, কোনো অনুমতি লাগে না।</string>
+    <string name="tagline">ইংরেজি, ফোনেটিক বাংলা আর বাংলা/Banglish ভয়েস টাইপিং। অফলাইন, বিজ্ঞাপন নেই।</string>
     <string name="status_active">কীবোর্ড চালু আছে</string>
     <string name="status_enabled">কীবোর্ড চালু হয়েছে, কিন্তু নির্বাচন করা হয়নি</string>
     <string name="status_off">কীবোর্ড এখনো চালু করা হয়নি</string>
@@ -44,9 +44,9 @@
     <string name="opt_hints_desc">প্রতিটি ইংরেজি কী-তে বাংলা অক্ষর দেখাবে।</string>
 
     <string name="section_about">সম্পর্কে</string>
-    <string name="about_body">লিখন একটি ছোট, অফলাইন কীবোর্ড। এটি কোনো অনুমতি চায় না, বিজ্ঞাপন নেই এবং কোথাও কিছু পাঠায় না। ইংরেজি সাধারণ QWERTY লেআউট; বাংলা ফোনেটিক, অর্থাৎ ইংরেজি অক্ষরে যেভাবে উচ্চারণ হয় সেভাবে লিখলেই বাংলা হয়।</string>
-    <string name="about_version">সংস্করণ ১.০</string>
-    <string name="footer">অফলাইন · কোনো অনুমতি নেই · বিজ্ঞাপন নেই</string>
+    <string name="about_body">লিখন একটি ছোট, অফলাইন কীবোর্ড। এতে বিজ্ঞাপন নেই এবং কোথাও কিছু পাঠায় না; মাইক্রোফোন কেবল ভয়েস টাইপিংয়ে ব্যবহার হয়। ইংরেজি সাধারণ QWERTY লেআউট; বাংলা ফোনেটিক, অর্থাৎ ইংরেজি অক্ষরে যেভাবে উচ্চারণ হয় সেভাবে লিখলেই বাংলা হয়।</string>
+    <string name="about_version">সংস্করণ ১.২</string>
+    <string name="footer">অফলাইন · বিজ্ঞাপন নেই · মাইক অনুমতি ঐচ্ছিক</string>
     <string name="about_guide">বাংলা টাইপিং নির্দেশিকা</string>
 
     <string name="guide_title">বাংলা টাইপিং নির্দেশিকা</string>
@@ -57,4 +57,38 @@
     <string name="enter_go">যান</string>
     <string name="enter_done">সম্পন্ন</string>
     <string name="enter_next">পরবর্তী</string>
+
+    <!-- Voice typing -->
+    <string name="voice_stop">থামুন</string>
+    <string name="voice_listening">শুনছি…</string>
+    <string name="voice_mode_bangla">বাংলা</string>
+    <string name="voice_mode_banglish">Banglish</string>
+    <string name="voice_mode_english">English</string>
+    <string name="voice_permission_needed">ভয়েস টাইপিংয়ের জন্য মাইক্রোফোনের অনুমতি দরকার। খোলা সেটিংসে অনুমতি দিন, তারপর আবার মাইকে চাপুন।</string>
+    <string name="voice_unavailable">এই ফোনে কোনো স্পিচ রিকগনিশন সার্ভিস পাওয়া যায়নি।</string>
+    <string name="voice_err_permission">মাইক্রোফোনের অনুমতি দেওয়া হয়নি।</string>
+    <string name="voice_err_network">স্পিচ রিকগনিশনের জন্য ইন্টারনেট, অথবা ডাউনলোড করা অফলাইন ভাষা দরকার।</string>
+    <string name="voice_err_audio">মাইক্রোফোন খোলা যায়নি।</string>
+    <string name="voice_err_language">ফোনের স্পিচ সার্ভিস এখনো বাংলা সমর্থন করে না।</string>
+    <string name="voice_err_generic">ভয়েস টাইপিং হঠাৎ বন্ধ হয়ে গেল। আবার চেষ্টা করুন।</string>
+
+    <string name="section_voice">ভয়েস টাইপিং</string>
+    <string name="section_voice_desc">মাইক কী চেপে বলুন: বাংলা, Banglish বা English।</string>
+    <string name="voice_permission_desc">কেবল কথা বলার সময় মাইক্রোফোন ব্যবহার হয়।</string>
+    <string name="voice_permission_action">মাইক অনুমতি</string>
+    <string name="voice_permission_granted">মাইক্রোফোনের অনুমতি আছে</string>
+    <string name="voice_permission_missing">মাইক্রোফোনের অনুমতি নেই</string>
+    <string name="voice_permission_ok">অনুমতি আছে</string>
+    <string name="voice_permission_denied">অনুমতি দেওয়া হয়নি</string>
+    <string name="voice_permission_denied_body">পরে অনুমতি দিতে পারেন: Android সেটিংস → অ্যাপ → লিখন কীবোর্ড → অনুমতি → মাইক্রোফোন।</string>
+    <string name="voice_language">ভয়েসের ভাষা</string>
+    <string name="voice_lang_auto">স্বয়ংক্রিয়</string>
+    <string name="voice_lang_bangla">বাংলা</string>
+    <string name="opt_banglish">Banglish আউটপুট</string>
+    <string name="opt_banglish_desc">বাংলায় বলুন, ইংরেজি অক্ষরে লিখবে: “ami bhalo achi”।</string>
+    <string name="opt_voice_continuous">শুনতে থাকবে</string>
+    <string name="opt_voice_continuous_desc">থামুন না চাপা পর্যন্ত প্রতিটি বাক্যের পর আবার শুরু হবে।</string>
+    <string name="opt_voice_cleanup">কথা পরিষ্কার করবে</string>
+    <string name="opt_voice_cleanup_desc">“উম”, “um”, আটকে যাওয়া ও একই শব্দ বারবার বলা বাদ দেবে।</string>
+    <string name="voice_note">রিকগনিশন ফোনের স্পিচ সার্ভিস (সাধারণত Google) করে। বাংলার জন্য ভাষা ডাউনলোড বা ইন্টারনেট লাগতে পারে; অ্যাপ নিজে ইন্টারনেটে যায় না।</string>
 </resources>

@@ -42,8 +42,49 @@ the keyboard to open settings at any time.
 - **Enter key** shows Search / Send / Go / Done / Next when the app asks for it.
 - **Numeric keyboard** for number and phone fields.
 - **Bangla digits**, `।`, `ঁ`, `্` and `৳` in Bangla mode.
+- **Voice typing** in Bangla, Banglish and English (see below).
+- **Word suggestions** while you type: a scrollable strip above the keys with
+  up to 18 completions. English uses the 10,000 most common words, Bangla uses
+  18,000 words matched against what you type in roman letters, so `bhal` offers
+  ভালো, ভালোবাসা, ভালোবাসি…
 - English **and** Bangla UI (follows the phone language).
-- Everything is offline and the app declares **no permissions at all**.
+- Typing and suggestions are fully offline. The only permission is the
+  microphone, and it is used only while voice typing is running.
+
+## Voice typing
+
+Tap the **microphone** key (bottom row of the letters and symbols pages) once.
+A strip appears above the keyboard: tap the microphone there to start and stop,
+or tap **×** to close it.
+
+- Each tap on the language chip cycles **বাংলা → Banglish → English**.
+  Bangla uses `bn-BD`, English uses `en-US`; Banglish listens in Bangla and then
+  writes what you said in roman letters (`আমি ভালো আছি` → `ami bhalo achhi`).
+- **Continuous** mode keeps the microphone open after each phrase and simply
+  carries on, like Gboard's Rambler dictation. Turn it off in settings if your
+  phone's speech service prefers one phrase per tap.
+- **Clean up** removes fillers and stutters (`উম`, `মানে`, `আঃ`, repeated words)
+  and tidies punctuation.
+- Partial results appear in the composing region and are replaced as the
+  recogniser refines them; nothing is committed twice.
+
+Speech recognition is done by the speech service already on the phone (usually
+Google). Bangla may need the Bangla language pack downloaded in that app, and
+some phones only do recognition online. The keyboard itself never sends
+anything anywhere and has no internet permission.
+
+## Word suggestions
+
+The strip above the keys shows completions for the word being typed.
+
+- In **English**, the 10,000 most frequent words are searched by prefix, so
+  `hel` gives hello, help, held, helpful… in frequency order.
+- In **Bangla**, suggestions follow the *roman* letters you type, not the
+  converted text: `kemon` → কেমন, `bhal` → ভালো, ভালোবাসা… This list is built
+  from a public-domain word list and romanised once at build time
+  (`tools/build-suggestions.sh`), so there is no work to do while typing.
+- Tap a suggestion to replace the word being typed and add a space.
+- Suggestions are hidden for password fields and number fields.
 
 ## Bangla typing guide
 
@@ -90,15 +131,21 @@ equivalent ARM64 build script is included. It uses the Ubuntu/Debian
 tools/build-apk-arm64.sh
 ```
 
-Output: `build/manual/LikhonKeyboard-1.1.apk` (signed with the debug key in
+Output: `build/manual/LikhonKeyboard-1.2.apk` (signed with the debug key in
 `keystore/likhon-debug.jks`, generated on first run — keep that file if you want
 future builds to install over the current one).
 
 Compile-time checks:
 
 ```bash
-tools/check-phonetic.sh     # phonetic engine tests, plain JDK
+tools/check-phonetic.sh       # phonetic engine + voice text tests, plain JDK
+tools/build-suggestions.sh    # rebuild the Bangla suggestion index
 ```
+
+The APK embeds two word lists in `app/src/main/assets/`:
+`words_en.txt` (frequency order) and `words_bn_index.txt`
+(roman, Bangla, rank — generated, do not edit by hand). The sources live in
+`tools/data/`.
 
 ## Project layout
 
@@ -110,12 +157,18 @@ app/src/main/java/com/likhon/keyboard/
   Key.java              immutable key model
   Phonetic.java         Roman → Bangla transliteration rules
   WordDictionary.java   curated exceptions for irregular spellings
+  Romanize.java         Bangla → Banglish, used by voice and by suggestions
+  VoiceInput.java       SpeechRecognizer wrapper, continuous dictation
+  VoiceText.java        filler/stutter cleanup for dictated text
+  Suggestions.java      prefix search over the two bundled word lists
   Palette.java          light/dark colours
   Prefs.java            typed SharedPreferences
   SettingsActivity.java setup + settings screen (code-built UI)
   Ui.java               small view/drawable helpers
+app/src/main/assets/    English + Bangla word lists for suggestions
 app/src/main/res/       manifest resources, method.xml, strings (en + bn), icons
-tools/                  icon generator, phonetic check, ARM64 APK build
+tools/                  icon generator, phonetic/voice checks, suggestion index,
+                        ARM64 APK build
 ```
 
 `KeyboardView` paints every key itself instead of inflating ~40 Views. That keeps
@@ -125,6 +178,15 @@ finger (key, long-press timer, delete-repeat timer), which is what allows
 simultaneous presses.
 
 ## Changes
+
+**1.2**
+
+- Voice typing with three modes (বাংলা, Banglish, English), a live partial
+  result in the composing region, continuous dictation and filler cleanup.
+- The microphone key and the voice strip; the only permission is `RECORD_AUDIO`.
+- Word suggestions with a scrollable strip above the keyboard: 10,000 English
+  words and 18,000 Bangla words matched by the roman letters you type.
+- Bundled word lists are loaded lazily, so the keyboard still starts instantly.
 
 **1.1**
 
@@ -139,7 +201,11 @@ simultaneous presses.
 
 ## Known limits
 
-- No word suggestions, auto-correction, or swipe typing (yet).
+- Suggestions are prefix-only: no next-word prediction, no learning from what
+  you type, and no auto-correction. Bangla suggestions can only offer words in
+  the bundled list, and only when they start with the letters you typed.
+- Voice typing depends on the phone's speech service; it does nothing if none
+  is installed, and Bangla needs a Bangla language pack.
 - The custom keyboard view is not fully accessible to TalkBack; keys are not
   exposed as individual accessibility nodes.
 - Phonetic Bangla is rule-based, not a full dictionary. Very irregular words can

@@ -78,12 +78,13 @@ final class Layouts {
         rows.add(new Row(0f, third));
 
         rows.add(new Row(0f,
-                Key.special(Key.SYMBOLS, "?123", 1.4f, false),
-                Key.special(Key.LANGUAGE, bangla ? "বাংলা" : "EN", 1.4f, bangla),
-                Key.ch(",", 0.9f),
-                Key.special(Key.SPACE, spaceLabel, 3.9f, false),
-                Key.ch(".", 0.9f),
-                enterKey(enterLabel, 1.4f)));
+                Key.special(Key.SYMBOLS, "?123", 1.3f, false),
+                Key.special(Key.LANGUAGE, bangla ? "বাংলা" : "EN", 1.3f, bangla),
+                Key.ch(",", 0.85f),
+                Key.special(Key.SPACE, spaceLabel, 3.3f, false),
+                Key.ch(".", 0.85f),
+                Key.special(Key.MIC, "mic", 0.9f, false),
+                enterKey(enterLabel, 1.3f)));
         return rows;
     }
 
@@ -141,8 +142,9 @@ final class Layouts {
                 Key.special(Key.LETTERS, "ABC", 1.4f, false),
                 Key.special(Key.LANGUAGE, bangla ? "বাংলা" : "EN", 1.4f, bangla),
                 Key.special(Key.EMOJI, "emoji", 0.9f, false),
-                Key.special(Key.SPACE, spaceLabel, 4.2f, false),
+                Key.special(Key.SPACE, spaceLabel, 3.3f, false),
                 Key.ch(",", 0.9f),
+                Key.special(Key.MIC, "mic", 0.9f, false),
                 enterKey(enterLabel, 1.4f));
     }
 

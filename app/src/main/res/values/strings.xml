@@ -6,7 +6,7 @@
     <string name="subtype_english">English</string>
     <string name="subtype_bangla">বাংলা (ফোনেটিক)</string>
 
-    <string name="tagline">Fast English and phonetic Bangla typing. Offline, no permissions.</string>
+    <string name="tagline">English, phonetic Bangla and voice typing. Offline, no ads.</string>
     <string name="status_active">Keyboard is active</string>
     <string name="status_enabled">Keyboard is enabled, but not selected</string>
     <string name="status_off">Keyboard is not enabled yet</string>
@@ -44,9 +44,9 @@
     <string name="opt_hints_desc">Show the Bangla letter on each English key.</string>
 
     <string name="section_about">About</string>
-    <string name="about_body">Likhon is a small, offline keyboard. It asks for no permissions, has no ads and never sends anything anywhere. English is a standard QWERTY layout; Bangla is phonetic, so you type the sound in English letters.</string>
-    <string name="about_version">Version 1.0</string>
-    <string name="footer">Offline · No permissions · No ads</string>
+    <string name="about_body">Likhon is a small, offline keyboard. It has no ads and never sends anything anywhere; the microphone is used only for voice typing. English is a standard QWERTY layout; Bangla is phonetic, so you type the sound in English letters.</string>
+    <string name="about_version">Version 1.2</string>
+    <string name="footer">Offline · No ads · Optional microphone</string>
     <string name="about_guide">Bangla typing guide</string>
 
     <string name="guide_title">Bangla typing guide</string>
@@ -57,4 +57,38 @@
     <string name="enter_go">Go</string>
     <string name="enter_done">Done</string>
     <string name="enter_next">Next</string>
+
+    <!-- Voice typing -->
+    <string name="voice_stop">Stop</string>
+    <string name="voice_listening">Listening…</string>
+    <string name="voice_mode_bangla">বাংলা</string>
+    <string name="voice_mode_banglish">Banglish</string>
+    <string name="voice_mode_english">English</string>
+    <string name="voice_permission_needed">Voice typing needs the microphone. Allow it in the settings that just opened, then tap the mic again.</string>
+    <string name="voice_unavailable">No speech recognition service was found on this phone.</string>
+    <string name="voice_err_permission">Microphone permission was denied.</string>
+    <string name="voice_err_network">Speech recognition needs a connection, or a downloaded offline language.</string>
+    <string name="voice_err_audio">The microphone could not be opened.</string>
+    <string name="voice_err_language">Your phone’s speech service does not support Bangla yet.</string>
+    <string name="voice_err_generic">Voice typing stopped unexpectedly. Try again.</string>
+
+    <string name="section_voice">Voice typing</string>
+    <string name="section_voice_desc">Tap the mic key and speak: Bangla, Banglish or English.</string>
+    <string name="voice_permission_desc">The microphone is used only while you speak.</string>
+    <string name="voice_permission_action">Allow mic</string>
+    <string name="voice_permission_granted">Microphone allowed</string>
+    <string name="voice_permission_missing">Microphone not allowed</string>
+    <string name="voice_permission_ok">Allowed</string>
+    <string name="voice_permission_denied">Permission denied</string>
+    <string name="voice_permission_denied_body">You can allow it later: Android Settings → Apps → Likhon Keyboard → Permissions → Microphone.</string>
+    <string name="voice_language">Voice language</string>
+    <string name="voice_lang_auto">Automatic</string>
+    <string name="voice_lang_bangla">বাংলা</string>
+    <string name="opt_banglish">Banglish output</string>
+    <string name="opt_banglish_desc">Speak Bangla, get Latin letters: “ami bhalo achi”.</string>
+    <string name="opt_voice_continuous">Keep listening</string>
+    <string name="opt_voice_continuous_desc">Starts again after every sentence until you tap Stop.</string>
+    <string name="opt_voice_cleanup">Clean up speech</string>
+    <string name="opt_voice_cleanup_desc">Removes “um”, “উম”, stutters and repeated words.</string>
+    <string name="voice_note">Recognition is done by your phone’s speech service (usually Google). Bangla may need a downloaded language or a connection; this app itself never goes online.</string>
 </resources>

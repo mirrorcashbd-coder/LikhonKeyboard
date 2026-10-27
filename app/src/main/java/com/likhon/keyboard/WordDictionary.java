@@ -51,6 +51,14 @@ final class WordDictionary {
             "korte", "করতে",
             "korechi", "করেছি",
             "koreche", "করেছে",
+            "kore", "করে",
+            "korbo", "করবো",
+            "korben", "করবেন",
+            "korchhi", "করছি",
+            "khabo", "খাবো",
+            "kheye", "খেয়ে",
+            "achi", "আছি",
+            "achen", "আছেন",
             "jante", "জানতে",
             "jantam", "জানতাম",
             "jani", "জানি",
@@ -91,6 +99,9 @@ final class WordDictionary {
             "tahole", "তাহলে",
             "kintu", "কিন্তু",
             "kichu", "কিছু",
+            "bhalo", "ভালো",
+            "kotha", "কথা",
+            "kemon", "কেমন",
 
             // everyday nouns
             "bari", "বাড়ি",
@@ -133,10 +144,12 @@ final class WordDictionary {
     };
 
     private static final Map<String, String> WORDS = new HashMap<>();
+    private static final Map<String, String> REVERSE = new HashMap<>();
 
     static {
         for (int i = 0; i + 1 < ENTRIES.length; i += 2) {
             WORDS.put(ENTRIES[i], ENTRIES[i + 1]);
+            REVERSE.put(ENTRIES[i + 1], ENTRIES[i]);
         }
     }
 
@@ -145,5 +158,10 @@ final class WordDictionary {
 
     static String lookup(String roman) {
         return WORDS.get(roman);
+    }
+
+    /** Bangla → the reviewed roman spelling, or null for unknown words. */
+    static String reverse(String bangla) {
+        return REVERSE.get(bangla);
     }
 }

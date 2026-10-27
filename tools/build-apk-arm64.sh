@@ -20,8 +20,8 @@ SDK="${ANDROID_SDK_ROOT:-/root/android-sdk}"
 PLATFORM="$SDK/platforms/android-34/android.jar"
 D8_JAR="$SDK/build-tools/34.0.0/lib/d8.jar"
 OUT="build/manual"
-VERSION_NAME="1.1"
-VERSION_CODE="2"
+VERSION_NAME="1.2"
+VERSION_CODE="3"
 MIN_SDK="23"
 TARGET_SDK="34"
 
@@ -67,6 +67,7 @@ echo "==> package resources"
 aapt package -f \
     -M "$MANIFEST" \
     -S app/src/main/res \
+    -A app/src/main/assets \
     -I "$PLATFORM" \
     --min-sdk-version "$MIN_SDK" \
     --target-sdk-version "$TARGET_SDK" \

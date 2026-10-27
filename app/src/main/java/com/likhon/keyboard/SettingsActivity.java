@@ -1,9 +1,11 @@
 package com.likhon.keyboard;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
@@ -29,6 +31,10 @@ import java.util.List;
  */
 public class SettingsActivity extends Activity {
 
+    /** When the keyboard sends the user here to grant the mic permission. */
+    public static final String EXTRA_REQUEST_MIC = "request_mic";
+    private static final int REQUEST_MIC = 41;
+
     private Prefs prefs;
     private Palette palette;
 
@@ -41,6 +47,9 @@ public class SettingsActivity extends Activity {
     private TextView chipEnglish;
     private TextView chipBangla;
     private LinearLayout themeChips;
+    private LinearLayout voiceLangChips;
+    private TextView micStatus;
+    private TextView micButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,12 +60,17 @@ public class SettingsActivity extends Activity {
         configureWindow();
         setContentView(buildContent());
         refreshStatus();
+        refreshVoiceStatus();
+        if (getIntent().getBooleanExtra(EXTRA_REQUEST_MIC, false) && !hasMicPermission()) {
+            requestMicPermission();
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         refreshStatus();
+        refreshVoiceStatus();
     }
 
     private void configureWindow() {
@@ -193,6 +207,10 @@ public class SettingsActivity extends Activity {
         addSection(root, getString(R.string.section_input),
                 getString(R.string.section_input_desc), inputCard);
 
+        // -------------------------------------------------------- voice card
+        addSection(root, getString(R.string.section_voice),
+                getString(R.string.section_voice_desc), buildVoiceCard());
+
         // -------------------------------------------------- appearance card
         LinearLayout themeCard = Ui.card(this, palette);
         themeChips = Ui.horizontal(this);
@@ -299,6 +317,132 @@ public class SettingsActivity extends Activity {
                 params.leftMargin = dp(8);
             }
             themeChips.addView(chip, params);
+        }
+    }
+
+    // ----------------------------------------------------------- voice typing
+
+    private LinearLayout buildVoiceCard() {
+        LinearLayout card = Ui.card(this, palette);
+
+        LinearLayout permRow = Ui.horizontal(this);
+        LinearLayout texts = Ui.vertical(this);
+        texts.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        micStatus = Ui.text(this, "", 14, palette.text, true);
+        TextView permHint = Ui.text(this, getString(R.string.voice_permission_desc), 12,
+                palette.textMuted, false);
+        permHint.setPadding(0, dp(3), 0, 0);
+        texts.addView(micStatus);
+        texts.addView(permHint);
+        permRow.addView(texts);
+        micButton = Ui.button(this, palette, getString(R.string.voice_permission_action), true,
+                this::requestMicPermission);
+        permRow.addView(micButton);
+        card.addView(permRow);
+
+        TextView language = Ui.text(this, getString(R.string.voice_language), 13,
+                palette.text, true);
+        language.setPadding(0, dp(20), 0, dp(8));
+        card.addView(language);
+
+        voiceLangChips = Ui.vertical(this);
+        card.addView(voiceLangChips);
+        rebuildVoiceLangChips();
+
+        addSwitchRow(card, R.string.opt_banglish, R.string.opt_banglish_desc,
+                Prefs.KEY_VOICE_BANGLISH, prefs.voiceBanglish());
+        addSwitchRow(card, R.string.opt_voice_continuous, R.string.opt_voice_continuous_desc,
+                Prefs.KEY_VOICE_CONTINUOUS, prefs.voiceContinuous());
+        addSwitchRow(card, R.string.opt_voice_cleanup, R.string.opt_voice_cleanup_desc,
+                Prefs.KEY_VOICE_CLEANUP, prefs.voiceCleanup());
+
+        TextView note = Ui.text(this, getString(R.string.voice_note), 12,
+                palette.textMuted, false);
+        note.setPadding(0, dp(12), 0, 0);
+        card.addView(note);
+        return card;
+    }
+
+    private void rebuildVoiceLangChips() {
+        if (voiceLangChips == null) {
+            return;
+        }
+        voiceLangChips.removeAllViews();
+        String selected = prefs.voiceLang();
+        String[][] options = {
+                {Prefs.VOICE_AUTO, getString(R.string.voice_lang_auto)},
+                {"bn-BD", getString(R.string.voice_lang_bangla)},
+                {"en-IN", "English (IN)"},
+                {"en-US", "English (US)"},
+        };
+        LinearLayout row = null;
+        for (int i = 0; i < options.length; i++) {
+            if (i % 2 == 0) {
+                row = Ui.horizontal(this);
+                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT);
+                if (i > 0) {
+                    rowParams.topMargin = dp(8);
+                }
+                voiceLangChips.addView(row, rowParams);
+            }
+            final String tag = options[i][0];
+            TextView chip = makeChip(options[i][1], selected.equals(tag), () -> {
+                prefs.setVoiceLang(tag);
+                rebuildVoiceLangChips();
+            });
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            if (i % 2 == 1) {
+                params.leftMargin = dp(8);
+            }
+            row.addView(chip, params);
+        }
+    }
+
+    private boolean hasMicPermission() {
+        return checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void requestMicPermission() {
+        if (hasMicPermission()) {
+            refreshVoiceStatus();
+            return;
+        }
+        requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_MIC);
+    }
+
+    private void refreshVoiceStatus() {
+        if (micStatus == null || micButton == null) {
+            return;
+        }
+        boolean granted = hasMicPermission();
+        micStatus.setText(granted ? R.string.voice_permission_granted
+                : R.string.voice_permission_missing);
+        micStatus.setTextColor(granted ? palette.success : palette.text);
+        micButton.setText(granted ? R.string.voice_permission_ok
+                : R.string.voice_permission_action);
+        micButton.setVisibility(granted ? View.GONE : View.VISIBLE);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                                           int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQUEST_MIC) {
+            return;
+        }
+        refreshVoiceStatus();
+        if (grantResults.length > 0 && grantResults[0] != PackageManager.PERMISSION_GRANTED) {
+            new AlertDialog.Builder(this, palette.dark ? R.style.Theme_Likhon_Dialog_Dark
+                    : R.style.Theme_Likhon_Dialog_Light)
+                    .setTitle(R.string.voice_permission_denied)
+                    .setMessage(R.string.voice_permission_denied_body)
+                    .setPositiveButton(R.string.action_done, null)
+                    .show();
         }
     }
 

@@ -1,17 +1,29 @@
 package com.likhon.keyboard;
 
+import android.Manifest;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.inputmethodservice.InputMethodService;
 import android.os.SystemClock;
+import android.speech.SpeechRecognizer;
 import android.text.InputType;
+import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
+import android.widget.HorizontalScrollView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.Toast;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * The input method service. It owns the input state (language, shift, page) and
@@ -23,11 +35,25 @@ import java.util.List;
  * the silent “o” is only known once the next letter arrives.
  */
 public class LikhonIme extends InputMethodService
-        implements KeyboardView.Listener, SharedPreferences.OnSharedPreferenceChangeListener {
+        implements KeyboardView.Listener, VoiceInput.Listener,
+        SharedPreferences.OnSharedPreferenceChangeListener {
 
     private KeyboardView keyboardView;
     private Prefs prefs;
     private Palette palette;
+
+    private LinearLayout voicePanel;
+    private TextView voiceStatus;
+    private TextView voiceMode;
+    private TextView voiceStopView;
+    private VoiceInput voice;
+    private boolean voiceListening;
+    private boolean voicePreviewing;
+
+    private Suggestions suggestions;
+    private HorizontalScrollView candidateScroll;
+    private LinearLayout candidateRow;
+    private String lastSuggestionKey = "";
 
     private boolean bangla;
     private boolean shift;
@@ -56,6 +82,10 @@ public class LikhonIme extends InputMethodService
 
     @Override
     public void onDestroy() {
+        if (voice != null) {
+            voice.destroy();
+            voice = null;
+        }
         if (prefs != null) {
             prefs.unregister(this);
         }
@@ -68,10 +98,86 @@ public class LikhonIme extends InputMethodService
     public View onCreateInputView() {
         keyboardView = new KeyboardView(this);
         keyboardView.setListener(this);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        suggestions = new Suggestions(this);
+        candidateScroll = buildCandidateBar();
+        root.addView(candidateScroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        voicePanel = buildVoicePanel();
+        root.addView(voicePanel, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        root.addView(keyboardView, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
         builtSignature = null;
         applyPreferences();
         refreshLayout();
-        return keyboardView;
+        // Read the word lists once, off the typing path.
+        candidateScroll.post(new Runnable() {
+            @Override
+            public void run() {
+                if (suggestions != null) {
+                    suggestions.preload();
+                }
+            }
+        });
+        return root;
+    }
+
+    /**
+     * The small strip above the keys that appears only while the microphone is
+     * live: it shows what was heard, the voice mode, and a stop button.
+     */
+    private LinearLayout buildVoicePanel() {
+        int pad = dp(8);
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.HORIZONTAL);
+        panel.setGravity(Gravity.CENTER_VERTICAL);
+        panel.setPadding(pad, dp(5), pad, dp(5));
+        panel.setVisibility(View.GONE);
+
+        voiceStatus = new TextView(this);
+        voiceStatus.setTextSize(14f);
+        voiceStatus.setSingleLine(true);
+        voiceStatus.setEllipsize(TextUtils.TruncateAt.END);
+        voiceStatus.setPadding(0, 0, pad, 0);
+        panel.addView(voiceStatus, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        voiceMode = new TextView(this);
+        voiceMode.setTextSize(13f);
+        voiceMode.setPadding(dp(10), dp(4), dp(10), dp(4));
+        voiceMode.setOnClickListener(v -> cycleVoiceMode());
+        panel.addView(voiceMode, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        voiceStopView = new TextView(this);
+        voiceStopView.setText(R.string.voice_stop);
+        voiceStopView.setTextSize(13f);
+        voiceStopView.setPadding(dp(10), dp(4), dp(10), dp(4));
+        voiceStopView.setOnClickListener(v -> stopVoice(false));
+        LinearLayout.LayoutParams stopParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        stopParams.leftMargin = dp(6);
+        panel.addView(voiceStopView, stopParams);
+        return panel;
+    }
+
+    /** The scrollable row of word suggestions above the keys. */
+    private HorizontalScrollView buildCandidateBar() {
+        HorizontalScrollView scroll = new HorizontalScrollView(this);
+        scroll.setHorizontalScrollBarEnabled(false);
+        scroll.setFillViewport(true);
+        scroll.setVisibility(View.GONE);
+        candidateRow = new LinearLayout(this);
+        candidateRow.setOrientation(LinearLayout.HORIZONTAL);
+        candidateRow.setGravity(Gravity.CENTER_VERTICAL);
+        candidateRow.setPadding(dp(4), dp(3), dp(4), dp(3));
+        scroll.addView(candidateRow, new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return scroll;
     }
 
     @Override
@@ -87,6 +193,7 @@ public class LikhonIme extends InputMethodService
         numeric = isNumeric(inputType);
         if (!restarting) {
             clearComposing();
+            stopVoice(true);
             page = numeric ? Layouts.PAGE_NUMERIC : Layouts.PAGE_LETTERS;
             emojiPage = 0;
             shift = autoShiftForNewField();
@@ -111,6 +218,12 @@ public class LikhonIme extends InputMethodService
     @Override
     public void onFinishInputView(boolean finishingInput) {
         finishWord();
+        hideCandidates();
+        stopVoice(true);
+        if (voice != null) {
+            voice.destroy();
+            voice = null;
+        }
         super.onFinishInputView(finishingInput);
     }
 
@@ -130,6 +243,12 @@ public class LikhonIme extends InputMethodService
                                   int candidatesStart, int candidatesEnd) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd,
                 candidatesStart, candidatesEnd);
+        // The framework reports every commit as a selection change, including
+        // our own, so recompute instead of clearing: this keeps suggestions for
+        // the word under the cursor when the cursor is moved by the app.
+        if (!composing) {
+            updateSuggestions();
+        }
         // The selection moved away from our composing region (or the app changed
         // the text): stop re-rendering that word.
         if (composing && candidatesStart < 0) {
@@ -205,6 +324,7 @@ public class LikhonIme extends InputMethodService
         palette = Palette.resolve(this, prefs.theme());
         keyboardView.setPalette(palette);
         keyboardView.setFeedback(prefs.haptic(), prefs.sound());
+        styleVoicePanel();
     }
 
     // ------------------------------------------------------------- the layout
@@ -235,17 +355,21 @@ public class LikhonIme extends InputMethodService
         switch (key.type) {
             case Key.CHAR:
                 type(key.output);
+                updateSuggestions();
                 break;
             case Key.SPACE:
                 finishWord();
                 commit(" ");
                 afterTyped(" ");
+                hideCandidates();
                 break;
             case Key.DELETE:
                 backspace();
+                updateSuggestions();
                 break;
             case Key.ENTER:
                 finishWord();
+                hideCandidates();
                 if (!sendDefaultEditorAction(true)) {
                     commit("\n");
                     afterTyped("\n");
@@ -259,6 +383,7 @@ public class LikhonIme extends InputMethodService
                 break;
             case Key.SYMBOLS:
                 finishWord();
+                hideCandidates();
                 if (page == Layouts.PAGE_MORE) {
                     page = Layouts.PAGE_SYMBOLS;
                 } else if (page == Layouts.PAGE_SYMBOLS) {
@@ -269,16 +394,19 @@ public class LikhonIme extends InputMethodService
                 refreshLayout();
                 break;
             case Key.MORE:
+                hideCandidates();
                 page = Layouts.PAGE_MORE;
                 refreshLayout();
                 break;
             case Key.LETTERS:
                 finishWord();
+                hideCandidates();
                 page = Layouts.PAGE_LETTERS;
                 refreshLayout();
                 break;
             case Key.EMOJI:
                 finishWord();
+                hideCandidates();
                 page = Layouts.PAGE_EMOJI;
                 refreshLayout();
                 break;
@@ -289,6 +417,9 @@ public class LikhonIme extends InputMethodService
             case Key.NEXT:
                 emojiPage = (emojiPage + 1) % Layouts.emojiPageCount();
                 refreshLayout();
+                break;
+            case Key.MIC:
+                toggleVoice();
                 break;
             default:
                 break;
@@ -402,6 +533,7 @@ public class LikhonIme extends InputMethodService
 
     private void toggleLanguage() {
         finishWord();
+        hideCandidates();
         bangla = !bangla;
         prefs.setBangla(bangla);
         shift = false;
@@ -463,6 +595,409 @@ public class LikhonIme extends InputMethodService
         return sb.toString();
     }
 
+    // ------------------------------------------------------------------ voice
+
+    private void toggleVoice() {
+        if (voiceListening) {
+            stopVoice(false);
+            return;
+        }
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, R.string.voice_permission_needed, Toast.LENGTH_LONG).show();
+            Intent intent = new Intent(this, SettingsActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            intent.putExtra(SettingsActivity.EXTRA_REQUEST_MIC, true);
+            startActivity(intent);
+            return;
+        }
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            Toast.makeText(this, R.string.voice_unavailable, Toast.LENGTH_LONG).show();
+            return;
+        }
+        finishWord();
+        hideCandidates();
+        voicePreviewing = false;
+        voiceListening = true;
+        keyboardView.setVoiceActive(true);
+        voicePanel.setVisibility(View.VISIBLE);
+        voiceStatus.setText(R.string.voice_listening);
+        updateVoiceLabels();
+        if (voice == null) {
+            voice = new VoiceInput(this, this);
+        }
+        voice.start(voiceLanguage(), prefs.voiceContinuous());
+    }
+
+    /** Asks the recogniser to finish what it heard and closes the strip. */
+    private void stopVoice(boolean cancel) {
+        if (voice != null) {
+            if (cancel) {
+                voice.cancel();
+            } else {
+                voice.stop();
+            }
+        }
+        voiceListening = false;
+        voicePreviewing = false;
+        if (keyboardView != null) {
+            keyboardView.setVoiceActive(false);
+        }
+        if (voicePanel != null) {
+            voicePanel.setVisibility(View.GONE);
+        }
+    }
+
+    private String voiceLanguage() {
+        String configured = prefs.voiceLang();
+        if (Prefs.VOICE_AUTO.equals(configured)) {
+            return bangla ? "bn-BD" : "en-US";
+        }
+        return configured;
+    }
+
+    private boolean voiceIsBangla() {
+        return voiceLanguage().startsWith("bn");
+    }
+
+    private String voiceModeLabel() {
+        if (!voiceIsBangla()) {
+            return getString(R.string.voice_mode_english);
+        }
+        return prefs.voiceBanglish()
+                ? getString(R.string.voice_mode_banglish)
+                : getString(R.string.voice_mode_bangla);
+    }
+
+    private void updateVoiceLabels() {
+        if (voiceMode != null) {
+            voiceMode.setText(voiceModeLabel());
+            styleVoicePanel();
+        }
+    }
+
+    /** বাংলা → Banglish → English → বাংলা */
+    private void cycleVoiceMode() {
+        if (!voiceIsBangla()) {
+            prefs.setVoiceLang("bn-BD");
+            prefs.setBoolean(Prefs.KEY_VOICE_BANGLISH, false);
+        } else if (!prefs.voiceBanglish()) {
+            prefs.setBoolean(Prefs.KEY_VOICE_BANGLISH, true);
+        } else {
+            prefs.setVoiceLang("en-US");
+            prefs.setBoolean(Prefs.KEY_VOICE_BANGLISH, false);
+        }
+        updateVoiceLabels();
+        if (voiceListening && voice != null) {
+            // Apply the new language to the running session immediately.
+            voice.cancel();
+            voice.start(voiceLanguage(), prefs.voiceContinuous());
+            voiceStatus.setText(R.string.voice_listening);
+        }
+    }
+
+    /** Applies the cleanup + optional Banglish conversion to raw speech. */
+    private String voiceText(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        String text = prefs.voiceCleanup() ? VoiceText.clean(raw) : raw.trim();
+        if (text.isEmpty()) {
+            return "";
+        }
+        if (prefs.voiceBanglish() && voiceIsBangla()) {
+            text = Romanize.toLatin(text);
+        }
+        return text;
+    }
+
+    private void showVoicePreview(String text) {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic != null) {
+            ic.setComposingText(text, 1);
+            voicePreviewing = true;
+        }
+    }
+
+    private String voiceErrorMessage(int code) {
+        switch (code) {
+            case SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS:
+                return getString(R.string.voice_err_permission);
+            case SpeechRecognizer.ERROR_NETWORK:
+            case SpeechRecognizer.ERROR_NETWORK_TIMEOUT:
+            case SpeechRecognizer.ERROR_SERVER:
+                return getString(R.string.voice_err_network);
+            case SpeechRecognizer.ERROR_AUDIO:
+                return getString(R.string.voice_err_audio);
+            case 12: // ERROR_LANGUAGE_UNAVAILABLE (API 31)
+            case 13: // ERROR_LANGUAGE_NOT_SUPPORTED (API 31)
+                return getString(R.string.voice_err_language);
+            default:
+                return getString(R.string.voice_err_generic);
+        }
+    }
+
+    private void styleVoicePanel() {
+        if (voicePanel == null || palette == null) {
+            return;
+        }
+        voicePanel.setBackgroundColor(palette.keySpecial);
+        voiceStatus.setTextColor(palette.text);
+        voiceMode.setTextColor(palette.onAccent);
+        voiceMode.setBackground(Ui.rounded(this, palette.accent, 10));
+        voiceStopView.setTextColor(palette.text);
+        voiceStopView.setBackground(Ui.rounded(this, palette.keyBg, 10));
+    }
+
+    private int dp(float value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    @Override
+    public void onVoiceListening() {
+        if (!voiceListening || voiceStatus == null) {
+            return;
+        }
+        if (!voicePreviewing) {
+            voiceStatus.setText(R.string.voice_listening);
+        }
+        updateVoiceLabels();
+    }
+
+    @Override
+    public void onVoicePartial(String text) {
+        if (!voiceListening) {
+            return;
+        }
+        String converted = voiceText(text);
+        if (converted.isEmpty()) {
+            return;
+        }
+        if (voiceStatus != null) {
+            voiceStatus.setText(converted);
+        }
+        showVoicePreview(converted);
+    }
+
+    @Override
+    public void onVoiceResult(String text) {
+        String converted = voiceText(text);
+        if (converted.isEmpty()) {
+            return;
+        }
+        voicePreviewing = false;
+        commit(converted + " ");
+        if (voiceStatus != null) {
+            voiceStatus.setText(converted);
+        }
+        if (!prefs.voiceContinuous() && voiceListening) {
+            stopVoice(false);
+        }
+    }
+
+    @Override
+    public void onVoiceStopped() {
+        if (!voiceListening) {
+            return;
+        }
+        voiceListening = false;
+        voicePreviewing = false;
+        if (keyboardView != null) {
+            keyboardView.setVoiceActive(false);
+        }
+        if (voicePanel != null) {
+            voicePanel.setVisibility(View.GONE);
+        }
+    }
+
+    @Override
+    public void onVoiceError(int code) {
+        voiceListening = false;
+        voicePreviewing = false;
+        if (keyboardView != null) {
+            keyboardView.setVoiceActive(false);
+        }
+        if (voicePanel != null) {
+            voicePanel.setVisibility(View.GONE);
+        }
+        Toast.makeText(this, voiceErrorMessage(code), Toast.LENGTH_LONG).show();
+    }
+
+    @Override
+    public void onVoiceUnavailable() {
+        voiceListening = false;
+        voicePreviewing = false;
+        if (keyboardView != null) {
+            keyboardView.setVoiceActive(false);
+        }
+        if (voicePanel != null) {
+            voicePanel.setVisibility(View.GONE);
+        }
+        Toast.makeText(this, R.string.voice_unavailable, Toast.LENGTH_LONG).show();
+    }
+
+    // ------------------------------------------------------------ suggestions
+
+    private void updateSuggestions() {
+        if (candidateRow == null) {
+            return;
+        }
+        // Work out what is being typed first; only then touch the list. The
+        // same prefix is often reported twice (typing and the app's selection
+        // callback), and rebuilding 18 chips twice per key is wasteful.
+        String key;
+        List<String> words;
+        if (bangla) {
+            if (!composing || rawWord.length() < 2) {
+                hideCandidates();
+                return;
+            }
+            key = "B" + rawWord;
+            words = null;
+        } else if (numeric || page != Layouts.PAGE_LETTERS || isSensitiveField()) {
+            hideCandidates();
+            return;
+        } else {
+            String typed = currentWordBeforeCursor();
+            if (typed.isEmpty()) {
+                hideCandidates();
+                return;
+            }
+            key = "E" + typed;
+            words = null;
+        }
+        if (key.equals(lastSuggestionKey) && candidateScroll != null
+                && candidateScroll.getVisibility() == View.VISIBLE) {
+            return;
+        }
+        lastSuggestionKey = key;
+        if (suggestions == null) {
+            suggestions = new Suggestions(this);
+        }
+        if (bangla) {
+            words = suggestions.bangla(rawWord.toString());
+        } else {
+            String typed = currentWordBeforeCursor();
+            words = suggestions.english(typed);
+            if (!words.isEmpty() && Character.isUpperCase(typed.charAt(0))) {
+                List<String> cased = new ArrayList<>(words.size());
+                for (String word : words) {
+                    cased.add(capitalised(word));
+                }
+                words = cased;
+            }
+        }
+        showCandidates(words);
+    }
+
+    private void showCandidates(List<String> words) {
+        if (candidateRow == null || candidateScroll == null) {
+            return;
+        }
+        candidateRow.removeAllViews();
+        if (words == null || words.isEmpty()) {
+            candidateScroll.setVisibility(View.GONE);
+            return;
+        }
+        for (final String word : words) {
+            TextView chip = new TextView(this);
+            chip.setText(word);
+            chip.setTextSize(15f);
+            chip.setSingleLine(true);
+            chip.setTextColor(palette.text);
+            chip.setPadding(dp(12), dp(7), dp(12), dp(7));
+            chip.setBackground(Ui.ripple(this, palette.keyBg, 9, palette.accent));
+            chip.setOnClickListener(v -> pickSuggestion(word));
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            params.rightMargin = dp(6);
+            candidateRow.addView(chip, params);
+        }
+        candidateScroll.setBackgroundColor(palette.keySpecial);
+        candidateScroll.setVisibility(View.VISIBLE);
+    }
+
+    private void hideCandidates() {
+        lastSuggestionKey = "";
+        if (candidateRow != null) {
+            candidateRow.removeAllViews();
+        }
+        if (candidateScroll != null) {
+            candidateScroll.setVisibility(View.GONE);
+        }
+    }
+
+    private void pickSuggestion(String word) {
+        if (word == null || word.isEmpty()) {
+            return;
+        }
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) {
+            return;
+        }
+        if (bangla) {
+            if (composing) {
+                // Replace the composing region with the chosen word, then end
+                // composing and only add the space.
+                setComposing(word);
+                finishWord();
+                commit(" ");
+            } else {
+                commit(word + " ");
+            }
+        } else {
+            String typed = currentWordBeforeCursor();
+            if (!typed.isEmpty()) {
+                ic.deleteSurroundingText(typed.length(), 0);
+            }
+            ic.commitText(word + " ", 1);
+        }
+        afterTyped(" ");
+        hideCandidates();
+    }
+
+    /** Letters (plus apostrophes) immediately before the cursor. */
+    private String currentWordBeforeCursor() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) {
+            return "";
+        }
+        CharSequence before = ic.getTextBeforeCursor(48, 0);
+        if (before == null || before.length() == 0) {
+            return "";
+        }
+        int end = before.length();
+        int start = end;
+        while (start > 0) {
+            char c = before.charAt(start - 1);
+            if (Character.isLetter(c) || c == '\'') {
+                start--;
+            } else {
+                break;
+            }
+        }
+        return before.subSequence(start, end).toString();
+    }
+
+    private boolean isSensitiveField() {
+        int cls = inputType & InputType.TYPE_MASK_CLASS;
+        if (cls != InputType.TYPE_CLASS_TEXT) {
+            return false;
+        }
+        int variation = inputType & InputType.TYPE_MASK_VARIATION;
+        return variation == InputType.TYPE_TEXT_VARIATION_PASSWORD
+                || variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                || variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD;
+    }
+
+    private static String capitalised(String word) {
+        if (word.isEmpty() || !Character.isLowerCase(word.charAt(0))) {
+            return word;
+        }
+        return Character.toUpperCase(word.charAt(0)) + word.substring(1);
+    }
+
     // ----------------------------------------------------------- preferences
 
     @Override
@@ -477,6 +1012,10 @@ public class LikhonIme extends InputMethodService
                 page = numeric ? Layouts.PAGE_NUMERIC : Layouts.PAGE_LETTERS;
                 refreshLayout();
             }
+            return;
+        }
+        if (Prefs.KEY_VOICE_LANG.equals(key) || Prefs.KEY_VOICE_BANGLISH.equals(key)) {
+            updateVoiceLabels();
             return;
         }
         applyPreferences();
