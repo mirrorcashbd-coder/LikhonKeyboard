@@ -60,7 +60,10 @@ final class OfflineVoice {
     private static final int FRAME = 1600;                 // 100 ms
     private static final int MAX_SECONDS = 30;
     private static final int WAIT_SPEECH_SECONDS = 12;
-    private static final float ABSOLUTE_FLOOR = 0.0065f;
+    /** Below this RMS the frame is silence even in a very quiet room. */
+    private static final float ABSOLUTE_FLOOR = 0.0032f;
+    /** Speech must be this many times louder than the room's noise floor. */
+    private static final float NOISE_FACTOR = 2.2f;
 
     private final Context context;
     private final Listener listener;
@@ -140,7 +143,6 @@ final class OfflineVoice {
                 if (token != session || !active) {
                     return;
                 }
-                listener.onOfflineReady();
                 phase = 1;
                 beginRecording();
             });
@@ -213,6 +215,24 @@ final class OfflineVoice {
                 return;
             }
         }
+        long started = SystemClock.elapsedRealtime();
+        OfflineRecognizer built = create(context, model, language);
+        VoiceLog.add("offline engine " + model.id + " in "
+                + (SystemClock.elapsedRealtime() - started) + " ms");
+        synchronized (engineLock) {
+            releaseEngineLocked();
+            recognizer = built;
+            engineModelId = model.id;
+            engineLanguage = model.kind == VoiceModels.KIND_WHISPER ? language : "";
+        }
+    }
+
+    /**
+     * Builds the sherpa-onnx recogniser for one model. Shared with the voice
+     * check in Settings, so a test exercises exactly the same code path as the
+     * keyboard.
+     */
+    static OfflineRecognizer create(Context context, VoiceModels.Model model, String language) {
         OfflineModelConfig modelConfig = new OfflineModelConfig();
         modelConfig.setTokens(VoiceModels.tokens(context, model));
         modelConfig.setProvider("cpu");
@@ -238,22 +258,11 @@ final class OfflineVoice {
         OfflineRecognizerConfig config = new OfflineRecognizerConfig();
         config.setFeatConfig(new FeatureConfig(SAMPLE_RATE, 80, 0f));
         config.setModelConfig(modelConfig);
-
-        OfflineRecognizer built;
-        long started = SystemClock.elapsedRealtime();
         try {
-            built = new OfflineRecognizer(null, config);
+            return new OfflineRecognizer(null, config);
         } catch (Throwable e) {
             VoiceLog.add("offline engine failed: " + e);
             throw e;
-        }
-        VoiceLog.add("offline engine " + model.id + " in "
-                + (SystemClock.elapsedRealtime() - started) + " ms");
-        synchronized (engineLock) {
-            releaseEngineLocked();
-            recognizer = built;
-            engineModelId = model.id;
-            engineLanguage = model.kind == VoiceModels.KIND_WHISPER ? language : "";
         }
     }
 
@@ -321,8 +330,12 @@ final class OfflineVoice {
         }
         int buffer = Math.max(min, FRAME * 2 * 4);
         AudioRecord created = null;
+        String source = "MIC";
         try {
-            created = new AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION,
+            // Raw microphone first: unlike VOICE_RECOGNITION it never applies
+            // an OEM noise suppressor that can gate quiet speech to silence,
+            // and the model expects unprocessed 16 kHz audio anyway.
+            created = new AudioRecord(MediaRecorder.AudioSource.MIC,
                     SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO,
                     AudioFormat.ENCODING_PCM_16BIT, buffer);
             if (created.getState() != AudioRecord.STATE_INITIALIZED) {
@@ -330,11 +343,12 @@ final class OfflineVoice {
                 created = null;
             }
         } catch (Throwable e) {
-            VoiceLog.add("voice source failed: " + e);
+            VoiceLog.add("mic source failed: " + e);
         }
         if (created == null) {
+            source = "VOICE_RECOGNITION";
             try {
-                created = new AudioRecord(MediaRecorder.AudioSource.MIC,
+                created = new AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION,
                         SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO,
                         AudioFormat.ENCODING_PCM_16BIT, buffer);
             } catch (Throwable e) {
@@ -357,6 +371,7 @@ final class OfflineVoice {
             fail(session, R.string.voice_offline_mic_failed, e.toString());
             return;
         }
+        VoiceLog.add("mic " + source + " @ " + SAMPLE_RATE + " Hz");
         recording = true;
         phase = 2;
         recordThread = new Thread(this::readLoop, "likhon-offline-mic");
@@ -369,6 +384,8 @@ final class OfflineVoice {
         short[] buffer = new short[FRAME];
         float[] frame = new float[FRAME];
         int token = session;
+        int framesSeen = 0;
+        float peak = 0f;
         while (recording && token == session && !stopRequested) {
             int count;
             try {
@@ -379,7 +396,8 @@ final class OfflineVoice {
             }
             if (count <= 0) {
                 if (count == AudioRecord.ERROR_INVALID_OPERATION
-                        || count == AudioRecord.ERROR_DEAD_OBJECT) {
+                        || count == AudioRecord.ERROR_DEAD_OBJECT
+                        || count == AudioRecord.ERROR_BAD_VALUE) {
                     break;
                 }
                 continue;
@@ -390,9 +408,15 @@ final class OfflineVoice {
             samples.add(frame, count);
             float level = rms(frame, count);
             postLevel(token, level);
+            framesSeen++;
+            peak = Math.max(peak, level);
+            if (framesSeen == 10) {
+                VoiceLog.add("mic level " + String.format(java.util.Locale.US, "%.4f", peak)
+                        + " after 1 s");
+            }
 
             if (speechStart < 0) {
-                float threshold = Math.max(ABSOLUTE_FLOOR, noiseFloor * 2.8f);
+                float threshold = Math.max(ABSOLUTE_FLOOR, noiseFloor * NOISE_FACTOR);
                 if (level > threshold) {
                     voicedFrames++;
                 } else {
@@ -401,10 +425,14 @@ final class OfflineVoice {
                 }
                 if (voicedFrames >= 2) {
                     speechStart = Math.max(0, samples.size() - (FRAME * 3) - (SAMPLE_RATE / 2));
+                    VoiceLog.add("speech start, level "
+                            + String.format(java.util.Locale.US, "%.4f", level));
                 } else if (samples.size() >= SAMPLE_RATE * WAIT_SPEECH_SECONDS) {
                     recording = false;
                     phase = 1;
                     stopRecorder();
+                    VoiceLog.add("no speech in " + WAIT_SPEECH_SECONDS + " s, peak "
+                            + String.format(java.util.Locale.US, "%.4f", peak));
                     if (active) {
                         main.post(() -> listener.onOfflineHint(R.string.voice_offline_heard_nothing));
                         if (continuous) {
@@ -422,7 +450,7 @@ final class OfflineVoice {
                     return;
                 }
             } else {
-                float threshold = Math.max(ABSOLUTE_FLOOR, noiseFloor * 2.8f);
+                float threshold = Math.max(ABSOLUTE_FLOOR, noiseFloor * NOISE_FACTOR);
                 if (level > threshold) {
                     silenceSamples = 0;
                 } else {
@@ -480,12 +508,17 @@ final class OfflineVoice {
         main.post(() -> listener.onOfflineStatus(R.string.voice_offline_decoding));
         worker.execute(() -> {
             String text;
+            long started = SystemClock.elapsedRealtime();
             try {
                 text = decode(audio);
             } catch (Throwable e) {
                 fail(token, R.string.voice_offline_decode_failed, e.toString());
                 return;
             }
+            VoiceLog.add("decoded " + String.format(java.util.Locale.US, "%.1f",
+                    audio.length / (float) SAMPLE_RATE) + " s in "
+                    + (SystemClock.elapsedRealtime() - started) + " ms: "
+                    + (text.isEmpty() ? "(empty)" : text));
             final String result = text;
             main.post(() -> {
                 if (token != session) {

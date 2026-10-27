@@ -1,0 +1,13 @@
+OpenMoji emoji artwork
+https://openmoji.org
+
+The emoji images in this folder are from OpenMoji, the open-source emoji and
+icon project, version 17.0.0.
+
+  Copyright 2024 OpenMoji (https://openmoji.org)
+  Licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/)
+
+The images are redistributed unmodified. The Bengali names and keywords come
+from the Unicode CLDR project and are used under the Unicode License v3. The
+app itself is not a derivative work of the artwork; only these image files are
+covered by CC BY-SA 4.0.

@@ -318,6 +318,31 @@
     <string name="sticker_preview_fav">Favourite</string>
     <string name="sticker_preview_unfav">Unfavourite</string>
     <string name="sticker_preview_close">Close</string>
+
+    <!-- Emoji Studio -->
+    <string name="emoji_title">Emoji Studio</string>
+    <string name="emoji_search_hint">Search all emoji</string>
+    <string name="emoji_search_tip">Type a name, English or বাংলা</string>
+    <string name="emoji_clear">Clear search</string>
+    <string name="emoji_close">Close emoji</string>
+    <string name="emoji_recent">Recent</string>
+    <string name="emoji_favorites">Favourites</string>
+    <string name="emoji_no_result">No emoji found</string>
+    <string name="emoji_no_favorites">Long-press an emoji to keep it here</string>
+    <string name="emoji_no_recent">Emoji you use will appear here</string>
+    <string name="emoji_fav_on">Added to favourites</string>
+    <string name="emoji_fav_off">Removed from favourites</string>
+    <string name="emoji_hint">Tap to type · long-press to favourite</string>
+    <string name="emoji_hint_search">Searching names and keywords in English and বাংলা</string>
+    <string name="emoji_group_smileys">Smileys</string>
+    <string name="emoji_group_people">People</string>
+    <string name="emoji_group_animals">Animals</string>
+    <string name="emoji_group_food">Food</string>
+    <string name="emoji_group_travel">Travel</string>
+    <string name="emoji_group_activities">Activities</string>
+    <string name="emoji_group_objects">Objects</string>
+    <string name="emoji_group_symbols">Symbols</string>
+    <string name="emoji_group_flags">Flags</string>
     <string name="sticker_license">Sticker artwork by Microsoft Fluent Emoji, MIT licence.</string>
 
     <!-- Offline (on-device) voice -->

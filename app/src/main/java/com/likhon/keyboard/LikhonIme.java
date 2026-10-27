@@ -103,6 +103,8 @@ public class LikhonIme extends InputMethodService
     private LinearLayout morePanel;
     private StickerPanel stickerPanel;
     private StickerStore stickerStore;
+    private EmojiPanel emojiPanel;
+    private EmojiStore emojiStore;
     private TextView translateTitle;
     private TextView translateSourceView;
     private TextView translateResultView;
@@ -623,9 +625,30 @@ public class LikhonIme extends InputMethodService
         if (key == null) {
             return;
         }
-        // While the sticker search is live the keys write into the panel's
-        // search field instead of the editor, so searching never needs a
-        // second window or a second keyboard.
+        // While a panel search is live the keys write into the panel's search
+        // field instead of the editor, so searching never needs a second
+        // window or a second keyboard.
+        if (emojiPanel != null && emojiPanel.isSearching()) {
+            switch (key.type) {
+                case Key.CHAR:
+                    emojiPanel.typeToSearch(key.output);
+                    return;
+                case Key.DELETE:
+                    emojiPanel.backspaceSearch();
+                    return;
+                case Key.SPACE:
+                    emojiPanel.typeToSearch(" ");
+                    return;
+                case Key.ENTER:
+                    emojiPanel.stopSearch();
+                    return;
+                case Key.EMOJI:
+                    emojiPanel.stopSearch();
+                    break;
+                default:
+                    break;
+            }
+        }
         if (stickerPanel != null && stickerPanel.isSearching()) {
             switch (key.type) {
                 case Key.CHAR:
@@ -726,8 +749,7 @@ public class LikhonIme extends InputMethodService
             case Key.EMOJI:
                 finishWord();
                 hideCandidates();
-                page = Layouts.PAGE_EMOJI;
-                refreshLayout();
+                toggleEmojiPanel();
                 break;
             case Key.PREV:
                 emojiPage = (emojiPage - 1 + Layouts.emojiPageCount()) % Layouts.emojiPageCount();
@@ -1075,13 +1097,14 @@ public class LikhonIme extends InputMethodService
     }
 
     private void hidePanels() {
-        boolean hadStickers = stickerPanel != null;
+        boolean hadPanels = stickerPanel != null || emojiPanel != null;
         if (panelHost != null) {
             panelHost.removeAllViews();
             panelHost.setVisibility(View.GONE);
         }
         stickerPanel = null;
-        if (hadStickers) {
+        emojiPanel = null;
+        if (hadPanels) {
             updateSuggestions();
         }
     }
@@ -1240,6 +1263,63 @@ public class LikhonIme extends InputMethodService
         Toast.makeText(this, prefs.incognito()
                 ? R.string.incognito_on : R.string.incognito_off, Toast.LENGTH_SHORT).show();
         hidePanels();
+    }
+
+    // ------------------------------------------------------------ emoji studio
+
+    private final EmojiPanel.Listener emojiListener = new EmojiPanel.Listener() {
+        @Override
+        public void onEmoji(String emoji) {
+            if (emoji == null || emoji.isEmpty()) {
+                return;
+            }
+            recordUndo(false);
+            commit(emoji);
+            updateSuggestions();
+        }
+
+        @Override
+        public void onClose() {
+            hidePanels();
+        }
+
+        @Override
+        public void onSearchStarted() {
+            finishWord();
+            hideCandidates();
+            if (page != Layouts.PAGE_LETTERS) {
+                page = Layouts.PAGE_LETTERS;
+                refreshLayout();
+            }
+        }
+
+        @Override
+        public void onSearchEnded() {
+            // The candidate strip returns when the whole panel closes.
+        }
+    };
+
+    private void toggleEmojiPanel() {
+        if (emojiPanel != null && emojiPanel.getParent() != null) {
+            hidePanels();
+            return;
+        }
+        hidePanels();
+        hideCandidates();
+        if (emojiStore == null) {
+            emojiStore = new EmojiStore(this);
+        }
+        if (page != Layouts.PAGE_LETTERS) {
+            page = Layouts.PAGE_LETTERS;
+            refreshLayout();
+        }
+        EmojiPanel panel = new EmojiPanel(this, palette, emojiStore,
+                prefs.haptic(), emojiListener);
+        emojiPanel = panel;
+        panelHost.addView(panel, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        panelHost.setVisibility(View.VISIBLE);
     }
 
     // --------------------------------------------------------------- stickers

@@ -320,6 +320,31 @@
     <string name="sticker_preview_close">বন্ধ</string>
     <string name="sticker_license">স্টিকার আর্ট: Microsoft Fluent Emoji, MIT লাইসেন্স।</string>
 
+    <!-- Emoji Studio -->
+    <string name="emoji_title">ইমোজি স্টুডিও</string>
+    <string name="emoji_search_hint">সব ইমোজি খুঁজুন</string>
+    <string name="emoji_search_tip">নাম লিখুন — English বা বাংলা</string>
+    <string name="emoji_clear">সার্চ মুছুন</string>
+    <string name="emoji_close">ইমোজি বন্ধ</string>
+    <string name="emoji_recent">সাম্প্রতিক</string>
+    <string name="emoji_favorites">প্রিয়</string>
+    <string name="emoji_no_result">কোনো ইমোজি পাওয়া যায়নি</string>
+    <string name="emoji_no_favorites">ইমোজিতে চেপে ধরলে প্রিয়তে জমা হবে</string>
+    <string name="emoji_no_recent">যে ইমোজি ব্যবহার করবেন সেগুলো এখানে আসবে</string>
+    <string name="emoji_fav_on">প্রিয়তে যোগ হয়েছে</string>
+    <string name="emoji_fav_off">প্রিয় থেকে সরানো হয়েছে</string>
+    <string name="emoji_hint">ট্যাপ করলে বসবে · চেপে ধরলে প্রিয়</string>
+    <string name="emoji_hint_search">English ও বাংলা নাম-কিওয়ার্ডে খোঁজা হচ্ছে</string>
+    <string name="emoji_group_smileys">হাসি</string>
+    <string name="emoji_group_people">মানুষ</string>
+    <string name="emoji_group_animals">প্রাণী</string>
+    <string name="emoji_group_food">খাবার</string>
+    <string name="emoji_group_travel">ভ্রমণ</string>
+    <string name="emoji_group_activities">শখ</string>
+    <string name="emoji_group_objects">বস্তু</string>
+    <string name="emoji_group_symbols">চিহ্ন</string>
+    <string name="emoji_group_flags">পতাকা</string>
+
     <!-- Offline (on-device) voice -->
     <string name="screen_offline">অফলাইন ভয়েস</string>
     <string name="screen_offline_desc">ফোনেই চলে এমন ভয়েস মডেল</string>
