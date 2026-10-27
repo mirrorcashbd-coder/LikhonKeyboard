@@ -534,7 +534,19 @@ public class KeyboardView extends View {
         canvas.drawPath(iconPath, iconPaint);
     }
 
+    private boolean showPreview = true;
+
+    void setShowPreview(boolean value) {
+        if (showPreview != value) {
+            showPreview = value;
+            invalidate();
+        }
+    }
+
     private void drawPreview(Canvas canvas) {
+        if (!showPreview) {
+            return;
+        }
         // One pop-up at a time: during two-thumb typing it would only flicker.
         Pointer only = singlePointer();
         if (only == null) {

@@ -239,18 +239,15 @@ final class VoiceInput implements RecognitionListener {
                 VoiceLog.add("engine pinned: " + chosen.flattenToShortString());
             }
         }
-        if (engines.isEmpty()) {
+        boolean google = addIfInstalled("com.google.android.googlequicksearchbox",
+                "com.google.android.voicesearch.serviceapi.GoogleRecognitionService");
+        if (engines.isEmpty() && !google) {
             // Null is the phone's current default recogniser.
             engines.add(null);
         }
         String defaultName = android.provider.Settings.Secure.getString(
                 context.getContentResolver(), "voice_recognition_service");
         VoiceLog.add("default engine: " + (defaultName == null ? "(none)" : defaultName));
-        // The Google app's recogniser is the one Gboard uses. It is added even
-        // when package visibility hides it from the query above; if the app is
-        // missing, creating the recogniser fails and the next engine is tried.
-        addIfInstalled("com.google.android.googlequicksearchbox",
-                "com.google.android.voicesearch.serviceapi.GoogleRecognitionService");
         for (ComponentName name : availableEngines(context)) {
             VoiceLog.add("engine found: " + name.flattenToShortString()
                     + (name.flattenToString().equals(defaultName) ? " (default)" : ""));
@@ -260,17 +257,18 @@ final class VoiceInput implements RecognitionListener {
         }
     }
 
-    private void addIfInstalled(String pkg, String cls) {
+    private boolean addIfInstalled(String pkg, String cls) {
         try {
             context.getPackageManager().getPackageInfo(pkg, 0);
         } catch (Exception e) {
-            return;
+            return false;
         }
         ComponentName name = new ComponentName(pkg, cls);
         if (!engines.contains(name)) {
             engines.add(name);
             VoiceLog.add("engine added: " + name.flattenToShortString());
         }
+        return true;
     }
 
     /** Every recognition service the phone exposes to this keyboard. */
@@ -456,20 +454,33 @@ final class VoiceInput implements RecognitionListener {
         boolean recoverable = error == SpeechRecognizer.ERROR_NO_MATCH
                 || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
                 || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
-                || error == SpeechRecognizer.ERROR_CLIENT;
+                || error == SpeechRecognizer.ERROR_CLIENT
+                || error == SpeechRecognizer.ERROR_TOO_MANY_REQUESTS;
         boolean engineProblem = error == SpeechRecognizer.ERROR_CLIENT
                 || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
                 || error == SpeechRecognizer.ERROR_AUDIO
                 || error == SpeechRecognizer.ERROR_SERVER
                 || error == SpeechRecognizer.ERROR_NETWORK
                 || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT
-                || error == SpeechRecognizer.ERROR_SERVER_DISCONNECTED
-                || error == SpeechRecognizer.ERROR_TOO_MANY_REQUESTS;
+                || error == SpeechRecognizer.ERROR_SERVER_DISCONNECTED;
         if (error == SpeechRecognizer.ERROR_NO_MATCH
                 || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
             engineMisses++;
             // An engine that never reports a voice or even a sound level is
             // not receiving audio at all (some phones bind a stub): move on.
+            if (engineMisses == 6 && !engineHeard && !engineAudio
+                    && !new Prefs(context).voiceEngine().isEmpty()) {
+                // A pinned engine that never even hears a sound is a dead end:
+                // forget the pin so the phone's own order is used again.
+                new Prefs(context).setVoiceEngine("");
+                VoiceLog.add("unpinned silent engine");
+                buildEngines();
+                engineIndex = 0;
+                destroyRecognizer();
+                listener.onVoiceHint(error);
+                handler.postDelayed(restart, RESTART_DELAY_MS);
+                return;
+            }
             if (engineMisses >= 6 && !engineHeard && !engineAudio && nextEngine()) {
                 destroyRecognizer();
                 listener.onVoiceHint(error);
@@ -502,8 +513,11 @@ final class VoiceInput implements RecognitionListener {
                 // These leave the instance unusable on several phones.
                 destroyRecognizer();
             }
+            // Google's service rate-limits rapid restarts; give it room.
+            long delay = error == SpeechRecognizer.ERROR_TOO_MANY_REQUESTS
+                    ? 3500 : RESTART_DELAY_MS;
             if (continuous) {
-                handler.postDelayed(restart, RESTART_DELAY_MS);
+                handler.postDelayed(restart, delay);
                 return;
             }
             listener.onVoiceStopped();

@@ -1,11 +1,15 @@
 package com.likhon.keyboard;
 
 import android.Manifest;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.inputmethodservice.InputMethodService;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.speech.SpeechRecognizer;
 import android.text.InputType;
@@ -16,10 +20,13 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.ExtractedText;
+import android.view.inputmethod.ExtractedTextRequest;
 import android.view.inputmethod.InputConnection;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -69,6 +76,30 @@ public class LikhonIme extends InputMethodService
     private View gripView;
     private float baseRowHeightDp = 48f;
     private String lastSuggestionKey = "";
+
+    // Editing tools: the toolbar above the suggestions, the clipboard history
+    // and the undo stack. All of it is local to this keyboard.
+    private LinearLayout toolBar;
+    private TextView undoView;
+    private TextView redoView;
+    private LinearLayout panelHost;
+    private LinearLayout clipPanel;
+    private LinearLayout clipList;
+    private TextView clipCount;
+    private LinearLayout translatePanel;
+    private TextView translateTitle;
+    private TextView translateSourceView;
+    private TextView translateResultView;
+    private ClipStore clips;
+    private UndoStack undoStack;
+    private Handler clipHandler;
+    private Runnable clipPoll;
+    private String lastClipSeen = "";
+    private String translateSourceText = "";
+    private String translateResultText = "";
+    private boolean translateFromSelection;
+    private long clearArmedAt;
+    private long lastSpaceAt;
 
     private static final int MAX_SUGGESTIONS = 18;
 
@@ -120,8 +151,18 @@ public class LikhonIme extends InputMethodService
         root.setOrientation(LinearLayout.VERTICAL);
         suggestions = new Suggestions(this);
         learned = new LearnedWords(this);
+        clips = new ClipStore(this);
+        undoStack = new UndoStack();
+        toolBar = buildToolBar();
+        root.addView(toolBar, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(36)));
         candidateScroll = buildCandidateBar();
         root.addView(candidateScroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        panelHost = new LinearLayout(this);
+        panelHost.setOrientation(LinearLayout.VERTICAL);
+        panelHost.setVisibility(View.GONE);
+        root.addView(panelHost, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         voicePanel = buildVoicePanel();
         root.addView(voicePanel, new LinearLayout.LayoutParams(
@@ -316,6 +357,12 @@ public class LikhonIme extends InputMethodService
     @Override
     public void onStartInputView(EditorInfo info, boolean restarting) {
         super.onStartInputView(info, restarting);
+        if (undoStack != null) {
+            undoStack.reset();
+            refreshToolbar();
+        }
+        hidePanels();
+        startClipWatch();
         applyPreferences();
         if (keyboardView != null) {
             applyRowHeight();
@@ -329,6 +376,8 @@ public class LikhonIme extends InputMethodService
 
     @Override
     public void onFinishInputView(boolean finishingInput) {
+        stopClipWatch();
+        hidePanels();
         finishWord();
         hideCandidates();
         if (learned != null) {
@@ -427,7 +476,9 @@ public class LikhonIme extends InputMethodService
     private float computeRowHeightDp() {
         float density = getResources().getDisplayMetrics().density;
         float screenDp = getResources().getDisplayMetrics().heightPixels / density;
-        float available = screenDp * 0.44f - 14f - 18f;
+        // The editing toolbar (36dp) now sits above the suggestions, so the
+        // rows give back most of that height to keep the keyboard the same size.
+        float available = screenDp * 0.44f - 14f - 18f - 30f;
         float row = available / 4f;
         return Math.max(40f, Math.min(56f, row));
     }
@@ -439,6 +490,7 @@ public class LikhonIme extends InputMethodService
         palette = Palette.resolve(this, prefs.theme());
         keyboardView.setPalette(palette);
         keyboardView.setFeedback(prefs.haptic(), prefs.sound());
+        keyboardView.setShowPreview(prefs.showPopup());
         styleVoicePanel();
         if (resizeHandle != null) {
             resizeHandle.setBackgroundColor(palette.bg);
@@ -448,6 +500,13 @@ public class LikhonIme extends InputMethodService
         }
         if (voiceLevel != null) {
             voiceLevel.setBackground(Ui.rounded(this, palette.accent, 2));
+        }
+        if (toolBar != null) {
+            toolBar.setBackgroundColor(palette.bg);
+            styleToolBar();
+        }
+        if (panelHost != null) {
+            panelHost.setBackgroundColor(palette.surfaceAlt);
         }
     }
 
@@ -459,13 +518,14 @@ public class LikhonIme extends InputMethodService
         }
         String spaceLabel = bangla ? "বাংলা" : "English";
         String signature = page + "|" + bangla + "|" + shift + "|" + caps + "|"
-                + prefs.hints() + "|" + enterLabel + "|" + emojiPage + "|" + numeric;
+                + prefs.hints() + "|" + prefs.numberRow() + "|" + enterLabel + "|"
+                + emojiPage + "|" + numeric;
         if (signature.equals(builtSignature)) {
             return;
         }
         builtSignature = signature;
         List<Layouts.Row> rows = Layouts.build(page, bangla, shift, caps, prefs.hints(),
-                enterLabel, spaceLabel, emojiPage);
+                prefs.numberRow(), enterLabel, spaceLabel, emojiPage);
         keyboardView.setKeys(rows);
     }
 
@@ -484,8 +544,22 @@ public class LikhonIme extends InputMethodService
             case Key.SPACE:
                 learnCurrentWord();
                 finishWord();
-                commit(" ");
-                afterTyped(" ");
+                long now = SystemClock.uptimeMillis();
+                if (prefs.doubleSpace() && lastSpaceAt > 0 && now - lastSpaceAt < 450) {
+                    recordUndo(false);
+                    InputConnection ic = getCurrentInputConnection();
+                    if (ic != null) {
+                        ic.deleteSurroundingText(1, 0);
+                        ic.commitText(bangla ? "। " : ". ", 1);
+                    }
+                    lastSpaceAt = 0;
+                    afterTyped(". ");
+                } else {
+                    recordUndo(false);
+                    commit(" ");
+                    afterTyped(" ");
+                    lastSpaceAt = now;
+                }
                 updateSuggestions();
                 break;
             case Key.DELETE:
@@ -495,6 +569,7 @@ public class LikhonIme extends InputMethodService
             case Key.ENTER:
                 learnCurrentWord();
                 finishWord();
+                recordUndo(false);
                 if (!sendDefaultEditorAction(true)) {
                     commit("\n");
                     afterTyped("\n");
@@ -555,11 +630,15 @@ public class LikhonIme extends InputMethodService
     @Override
     public void onKeyLongPress(Key key) {
         if (key != null && key.type == Key.LANGUAGE) {
-            Intent intent = new Intent(this, SettingsActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                    | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            startActivity(intent);
+            openSettings();
         }
+    }
+
+    private void openSettings() {
+        Intent intent = new Intent(this, SettingsActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        intent.putExtra(SettingsActivity.EXTRA_PANEL, SettingsActivity.PANEL_EDITING);
+        startActivity(intent);
     }
 
     // ---------------------------------------------------------------- typing
@@ -568,6 +647,7 @@ public class LikhonIme extends InputMethodService
         if (text == null || text.isEmpty()) {
             return;
         }
+        recordUndo(true);
         char first = text.charAt(0);
         if (!Phonetic.isLetter(first)) {
             // A separator ("." "," "!" or a symbol) ends the word before it.
@@ -604,6 +684,7 @@ public class LikhonIme extends InputMethodService
     }
 
     private void backspace() {
+        recordUndo(false);
         if (bangla && composing) {
             if (rawWord.length() > 0) {
                 rawWord.deleteCharAt(rawWord.length() - 1);
@@ -760,6 +841,591 @@ public class LikhonIme extends InputMethodService
             }
         }
         return text.subSequence(start, end).toString();
+    }
+
+    // -------------------------------------------------------- editing tools
+
+    /** The small always-on row above the suggestions: undo … translate. */
+    private LinearLayout buildToolBar() {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(dp(3), 0, dp(3), 0);
+        bar.setBackgroundColor(palette.bg);
+        undoView = toolButton(bar, "↩", R.string.action_undo, this::performUndo);
+        redoView = toolButton(bar, "↪", R.string.action_redo, this::performRedo);
+        toolButton(bar, "📋", R.string.action_clipboard, this::toggleClipPanel);
+        toolButton(bar, "📄", R.string.action_copy, this::copyToClipboard);
+        toolButton(bar, "⬇", R.string.action_paste, this::pasteFromClipboard);
+        toolButton(bar, "🌐", R.string.action_translate, this::toggleTranslatePanel);
+        toolButton(bar, "⚙", R.string.action_settings, this::openSettings);
+        refreshToolbar();
+        return bar;
+    }
+
+    private TextView toolButton(LinearLayout bar, String label, int description, Runnable action) {
+        TextView view = new TextView(this);
+        view.setText(label);
+        view.setTextSize(16f);
+        view.setGravity(Gravity.CENTER);
+        view.setTextColor(palette.text);
+        view.setContentDescription(getString(description));
+        view.setBackground(Ui.ripple(this, palette.bg, 8, palette.keyStroke));
+        view.setClickable(true);
+        view.setFocusable(true);
+        view.setOnClickListener(v -> action.run());
+        bar.addView(view, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.MATCH_PARENT, 1f));
+        return view;
+    }
+
+    private void styleToolBar() {
+        if (toolBar == null) {
+            return;
+        }
+        for (int i = 0; i < toolBar.getChildCount(); i++) {
+            View child = toolBar.getChildAt(i);
+            if (child instanceof TextView) {
+                ((TextView) child).setTextColor(palette.text);
+                child.setBackground(Ui.ripple(this, palette.bg, 8, palette.keyStroke));
+            }
+        }
+        refreshToolbar();
+    }
+
+    private void refreshToolbar() {
+        boolean canUndo = undoStack != null && undoStack.canUndo();
+        boolean canRedo = undoStack != null && undoStack.canRedo();
+        if (undoView != null) {
+            undoView.setAlpha(canUndo ? 1f : 0.3f);
+        }
+        if (redoView != null) {
+            redoView.setAlpha(canRedo ? 1f : 0.3f);
+        }
+    }
+
+    private void hidePanels() {
+        if (panelHost != null) {
+            panelHost.removeAllViews();
+            panelHost.setVisibility(View.GONE);
+        }
+    }
+
+    // ------------------------------------------------------------------- undo
+
+    /**
+     * Remembers the field as it is now, before an edit. Only plain text fields
+     * that hand out their text through {@link ExtractedText} can be undone;
+     * everywhere else the undo button simply stays dim.
+     */
+    private void recordUndo(boolean typing) {
+        if (undoStack == null || isSensitiveField()) {
+            return;
+        }
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) {
+            return;
+        }
+        try {
+            ExtractedText et = ic.getExtractedText(new ExtractedTextRequest(), 0);
+            if (et == null || et.text == null || et.startOffset != 0) {
+                return;
+            }
+            String text = et.text.toString();
+            if (text.length() > 20000) {
+                return;
+            }
+            undoStack.record(text, et.selectionStart, et.selectionEnd, typing);
+            refreshToolbar();
+        } catch (RuntimeException ignored) {
+            // The app does not support extracted text; no undo there.
+        }
+    }
+
+    private void performUndo() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null || undoStack == null) {
+            return;
+        }
+        ExtractedText et = extracted(ic);
+        String current = et != null && et.text != null ? et.text.toString() : null;
+        if (current == null) {
+            Toast.makeText(this, R.string.undo_unsupported, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        UndoStack.Snap snap = undoStack.undo(current,
+                et.selectionStart, et.selectionEnd);
+        if (snap != null) {
+            restore(ic, current, snap);
+        }
+        refreshToolbar();
+    }
+
+    private void performRedo() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null || undoStack == null) {
+            return;
+        }
+        ExtractedText et = extracted(ic);
+        String current = et != null && et.text != null ? et.text.toString() : null;
+        if (current == null) {
+            return;
+        }
+        UndoStack.Snap snap = undoStack.redo(current,
+                et.selectionStart, et.selectionEnd);
+        if (snap != null) {
+            restore(ic, current, snap);
+        }
+        refreshToolbar();
+    }
+
+    private void restore(InputConnection ic, String current, UndoStack.Snap snap) {
+        finishWord();
+        try {
+            ic.beginBatchEdit();
+            ic.setSelection(0, current.length());
+            ic.commitText(snap.text, 1);
+            int length = snap.text.length();
+            ic.setSelection(Math.min(snap.start, length), Math.min(snap.end, length));
+            ic.endBatchEdit();
+        } catch (RuntimeException ignored) {
+            // Nothing sensible to do if the editor refuses.
+        }
+        lastSuggestionKey = "";
+        updateSuggestions();
+    }
+
+    private ExtractedText extracted(InputConnection ic) {
+        try {
+            ExtractedText et = ic.getExtractedText(new ExtractedTextRequest(), 0);
+            if (et == null || et.text == null || et.startOffset != 0) {
+                return null;
+            }
+            return et;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    // -------------------------------------------------------------- clipboard
+
+    /** Keeps watch for new copies while the keyboard is on screen. */
+    private void startClipWatch() {
+        stopClipWatch();
+        clipHandler = new Handler(Looper.getMainLooper());
+        clipPoll = new Runnable() {
+            @Override
+            public void run() {
+                captureClipboard();
+                if (clipHandler != null) {
+                    clipHandler.postDelayed(this, 1500);
+                }
+            }
+        };
+        clipHandler.postDelayed(clipPoll, 500);
+    }
+
+    private void stopClipWatch() {
+        if (clipHandler != null && clipPoll != null) {
+            clipHandler.removeCallbacks(clipPoll);
+        }
+        clipHandler = null;
+        clipPoll = null;
+    }
+
+    private void captureClipboard() {
+        if (clips == null || isSensitiveField()) {
+            return;
+        }
+        try {
+            ClipboardManager manager = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (manager == null || !manager.hasPrimaryClip()) {
+                return;
+            }
+            ClipData clip = manager.getPrimaryClip();
+            if (clip == null || clip.getItemCount() == 0) {
+                return;
+            }
+            CharSequence text = clip.getItemAt(0).coerceToText(this);
+            if (text == null) {
+                return;
+            }
+            String value = text.toString().trim();
+            if (value.isEmpty() || value.equals(lastClipSeen)) {
+                return;
+            }
+            lastClipSeen = value;
+            clips.add(value);
+            if (clipPanel != null && clipPanel.getVisibility() == View.VISIBLE) {
+                rebuildClipList();
+            }
+        } catch (RuntimeException ignored) {
+            // Clipboard access can be denied while the field is not focused.
+        }
+    }
+
+    private void copyToClipboard() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) {
+            return;
+        }
+        CharSequence selection = ic.getSelectedText(0);
+        String text = selection == null ? "" : selection.toString();
+        boolean whole = false;
+        if (text.trim().isEmpty()) {
+            ExtractedText et = extracted(ic);
+            if (et != null && et.text != null) {
+                text = et.text.toString();
+                whole = true;
+            } else {
+                CharSequence before = ic.getTextBeforeCursor(1000, 0);
+                text = before == null ? "" : before.toString();
+            }
+        }
+        if (text.trim().isEmpty()) {
+            Toast.makeText(this, R.string.clip_nothing, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        ClipboardManager manager = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (manager != null) {
+            manager.setPrimaryClip(ClipData.newPlainText("Likhon", text));
+        }
+        if (clips != null) {
+            clips.add(text);
+            lastClipSeen = text.trim();
+        }
+        Toast.makeText(this, whole ? R.string.clip_copied_all : R.string.clip_copied,
+                Toast.LENGTH_SHORT).show();
+    }
+
+    private String systemClipText() {
+        try {
+            ClipboardManager manager = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (manager == null || !manager.hasPrimaryClip()) {
+                return "";
+            }
+            ClipData clip = manager.getPrimaryClip();
+            if (clip == null || clip.getItemCount() == 0) {
+                return "";
+            }
+            CharSequence text = clip.getItemAt(0).coerceToText(this);
+            return text == null ? "" : text.toString();
+        } catch (RuntimeException e) {
+            return "";
+        }
+    }
+
+    private void pasteFromClipboard() {
+        String text = systemClipText();
+        if (text.trim().isEmpty() && clips != null) {
+            List<ClipStore.Entry> entries = clips.entries();
+            if (!entries.isEmpty()) {
+                text = entries.get(0).text;
+            }
+        }
+        if (text.trim().isEmpty()) {
+            Toast.makeText(this, R.string.paste_nothing, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        insertText(text);
+    }
+
+    private void insertText(String text) {
+        recordUndo(false);
+        finishWord();
+        commit(text);
+        updateSuggestions();
+    }
+
+    private void toggleClipPanel() {
+        if (clipPanel != null && clipPanel.getParent() != null) {
+            hidePanels();
+            return;
+        }
+        hidePanels();
+        if (clipPanel == null) {
+            clipPanel = buildClipPanel();
+        }
+        rebuildClipList();
+        panelHost.addView(clipPanel, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        panelHost.setVisibility(View.VISIBLE);
+    }
+
+    private LinearLayout buildClipPanel() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(8), dp(6), dp(8), dp(6));
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        clipCount = Ui.text(this, getString(R.string.clip_title), 12, palette.textMuted, true);
+        clipCount.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        header.addView(clipCount);
+        header.addView(panelButton(getString(R.string.clip_clear), this::confirmClearClips));
+        header.addView(panelButton("✕", this::hidePanels));
+        panel.addView(header, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(140)));
+        clipList = new LinearLayout(this);
+        clipList.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(clipList);
+        panel.addView(scroll);
+        return panel;
+    }
+
+    private TextView panelButton(String label, Runnable action) {
+        TextView view = Ui.text(this, label, 12, palette.text, true);
+        view.setPadding(dp(10), dp(6), dp(10), dp(6));
+        view.setBackground(Ui.ripple(this, palette.keySpecial, 8, palette.keyStroke));
+        view.setClickable(true);
+        view.setOnClickListener(v -> action.run());
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.leftMargin = dp(6);
+        view.setLayoutParams(params);
+        return view;
+    }
+
+    private void rebuildClipList() {
+        if (clipList == null || clips == null) {
+            return;
+        }
+        clipList.removeAllViews();
+        List<ClipStore.Entry> entries = clips.entries();
+        if (clipCount != null) {
+            clipCount.setText(getString(R.string.clip_title_count, entries.size()));
+        }
+        if (entries.isEmpty()) {
+            clipList.addView(Ui.text(this, getString(R.string.clip_empty), 12,
+                    palette.textMuted, false));
+            return;
+        }
+        for (final ClipStore.Entry entry : entries) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            TextView text = Ui.text(this, preview(entry.text), 13, palette.text, false);
+            text.setSingleLine(true);
+            text.setEllipsize(TextUtils.TruncateAt.END);
+            text.setPadding(dp(10), dp(9), dp(10), dp(9));
+            text.setBackground(Ui.ripple(this, palette.surface, 8, palette.keyStroke));
+            text.setLayoutParams(new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            text.setOnClickListener(v -> {
+                insertText(entry.text);
+                hidePanels();
+            });
+            row.addView(text);
+            TextView delete = Ui.text(this, "✕", 13, palette.textMuted, true);
+            delete.setPadding(dp(12), dp(9), dp(6), dp(9));
+            delete.setContentDescription(getString(R.string.clip_delete));
+            delete.setOnClickListener(v -> {
+                clips.remove(entry.id);
+                rebuildClipList();
+            });
+            row.addView(delete);
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            rowParams.topMargin = dp(4);
+            clipList.addView(row, rowParams);
+        }
+    }
+
+    /**
+     * Two taps instead of a dialog: an input method cannot reliably open a
+     * dialog window, so the first tap only arms the button.
+     */
+    private void confirmClearClips() {
+        if (clips == null || clips.size() == 0) {
+            return;
+        }
+        long now = SystemClock.uptimeMillis();
+        if (now - clearArmedAt > 4000) {
+            clearArmedAt = now;
+            Toast.makeText(this, getString(R.string.clip_clear_confirm, clips.size()),
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        clearArmedAt = 0;
+        clips.clear();
+        rebuildClipList();
+        Toast.makeText(this, R.string.clip_cleared, Toast.LENGTH_SHORT).show();
+    }
+
+    private static String preview(String text) {
+        String oneLine = text.replace('\n', ' ').trim();
+        return oneLine.length() <= 80 ? oneLine : oneLine.substring(0, 80) + "…";
+    }
+
+    // -------------------------------------------------------------- translate
+
+    private void toggleTranslatePanel() {
+        if (translatePanel != null && translatePanel.getParent() != null) {
+            hidePanels();
+            return;
+        }
+        hidePanels();
+        if (translatePanel == null) {
+            translatePanel = buildTranslatePanel();
+        }
+        String source = translateSource();
+        if (source.isEmpty()) {
+            Toast.makeText(this, R.string.translate_nothing, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        translateSourceText = source;
+        translateResultText = "";
+        if (translateSourceView != null) {
+            translateSourceView.setText(source);
+        }
+        if (translateResultView != null) {
+            translateResultView.setText(R.string.translate_loading);
+        }
+        panelHost.addView(translatePanel, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        panelHost.setVisibility(View.VISIBLE);
+        runTranslation();
+    }
+
+    private String translateSource() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) {
+            return "";
+        }
+        translateFromSelection = false;
+        CharSequence selection = ic.getSelectedText(0);
+        if (selection != null && !selection.toString().trim().isEmpty()) {
+            translateFromSelection = true;
+            return selection.toString().trim();
+        }
+        ExtractedText et = extracted(ic);
+        if (et != null && et.text != null) {
+            String all = et.text.toString().trim();
+            if (!all.isEmpty() && all.length() <= 400) {
+                return all;
+            }
+        }
+        CharSequence before = ic.getTextBeforeCursor(200, 0);
+        return before == null ? "" : before.toString().trim();
+    }
+
+    private LinearLayout buildTranslatePanel() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(8), dp(6), dp(8), dp(6));
+
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        translateTitle = Ui.text(this, getString(R.string.action_translate), 12,
+                palette.textMuted, true);
+        translateTitle.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        header.addView(translateTitle);
+        header.addView(panelButton("✕", this::hidePanels));
+        panel.addView(header, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        translateSourceView = Ui.text(this, "", 12, palette.textMuted, false);
+        translateSourceView.setMaxLines(2);
+        translateSourceView.setEllipsize(TextUtils.TruncateAt.END);
+        panel.addView(translateSourceView);
+
+        translateResultView = Ui.text(this, "", 15, palette.text, true);
+        translateResultView.setPadding(0, dp(4), 0, dp(6));
+        panel.addView(translateResultView);
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.addView(panelButton(getString(R.string.translate_insert),
+                this::insertTranslation));
+        actions.addView(panelButton(getString(R.string.translate_replace),
+                this::replaceTranslation));
+        actions.addView(panelButton(getString(R.string.translate_copy),
+                this::copyTranslation));
+        panel.addView(actions);
+        return panel;
+    }
+
+    private void runTranslation() {
+        final String source = translateSourceText;
+        final boolean toBangla = !Translator.isBangla(source);
+        if (translateTitle != null) {
+            translateTitle.setText(getString(toBangla
+                    ? R.string.translate_to_bangla : R.string.translate_to_english));
+        }
+        if (translateResultView != null) {
+            translateResultView.setText(R.string.translate_loading);
+        }
+        Translator.translate(source, toBangla ? "en" : "bn", toBangla ? "bn" : "en",
+                (translated, error) -> {
+                    if (translated == null) {
+                        translateResultText = "";
+                        if (translateResultView != null) {
+                            translateResultView.setText(R.string.translate_error);
+                        }
+                        return;
+                    }
+                    translateResultText = translated;
+                    if (translateResultView != null) {
+                        translateResultView.setText(translated);
+                    }
+                });
+    }
+
+    private void insertTranslation() {
+        if (translateResultText.isEmpty()) {
+            return;
+        }
+        insertText(translateResultText);
+        hidePanels();
+    }
+
+    private void replaceTranslation() {
+        if (translateResultText.isEmpty()) {
+            return;
+        }
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) {
+            return;
+        }
+        recordUndo(false);
+        finishWord();
+        if (translateFromSelection) {
+            ic.commitText(translateResultText, 1);
+        } else {
+            ExtractedText et = extracted(ic);
+            if (et != null && et.text != null && et.text.length() <= 400) {
+                ic.setSelection(0, et.text.length());
+                ic.commitText(translateResultText, 1);
+            } else {
+                ic.commitText(translateResultText, 1);
+            }
+        }
+        hidePanels();
+        lastSuggestionKey = "";
+        updateSuggestions();
+    }
+
+    private void copyTranslation() {
+        if (translateResultText.isEmpty()) {
+            return;
+        }
+        ClipboardManager manager = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (manager != null) {
+            manager.setPrimaryClip(ClipData.newPlainText("Likhon", translateResultText));
+        }
+        if (clips != null) {
+            clips.add(translateResultText);
+            lastClipSeen = translateResultText.trim();
+        }
+        Toast.makeText(this, R.string.clip_copied, Toast.LENGTH_SHORT).show();
     }
 
     // ------------------------------------------------------------------ voice
@@ -1052,6 +1718,7 @@ public class LikhonIme extends InputMethodService
             return;
         }
         voicePreviewing = false;
+        recordUndo(false);
         commit(converted + " ");
         VoiceLog.add("insert: " + converted);
         learnSentence(converted);

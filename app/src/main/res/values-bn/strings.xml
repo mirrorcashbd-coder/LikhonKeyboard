@@ -45,7 +45,7 @@
 
     <string name="section_about">সম্পর্কে</string>
     <string name="about_body">লিখন একটি ছোট, অফলাইন কীবোর্ড। এতে বিজ্ঞাপন নেই এবং কোথাও কিছু পাঠায় না; মাইক্রোফোন কেবল ভয়েস টাইপিংয়ে ব্যবহার হয়। ইংরেজি সাধারণ QWERTY লেআউট; বাংলা ফোনেটিক, অর্থাৎ ইংরেজি অক্ষরে যেভাবে উচ্চারণ হয় সেভাবে লিখলেই বাংলা হয়।</string>
-    <string name="about_version">সংস্করণ ১.৯</string>
+    <string name="about_version">সংস্করণ ১.১০</string>
     <string name="footer">অফলাইন · বিজ্ঞাপন নেই · মাইক অনুমতি ঐচ্ছিক</string>
     <string name="about_guide">বাংলা টাইপিং নির্দেশিকা</string>
 
@@ -123,4 +123,44 @@
     <string name="suggestion_forgotten">সাজেশন থেকে বাদ দেওয়া হলো</string>
     <string name="voice_deleting">মুছছি…</string>
     <string name="voice_deleted">মুছে ফেলা হলো</string>
+    <string name="action_undo">আনডো</string>
+    <string name="action_redo">রিডো</string>
+    <string name="action_clipboard">ক্লিপবোর্ড হিস্ট্রি</string>
+    <string name="action_copy">কপি</string>
+    <string name="action_paste">পেস্ট</string>
+    <string name="action_translate">অনুবাদ</string>
+    <string name="undo_unsupported">এই অ্যাপ লেখা শেয়ার করে না, তাই এখানে আনডো সম্ভব নয়।</string>
+    <string name="clip_title">ক্লিপবোর্ড</string>
+    <string name="clip_title_count">ক্লিপবোর্ড · %1$d</string>
+    <string name="clip_empty">এখনো কিছু কপি হয়নি।</string>
+    <string name="clip_clear">সব মুছুন</string>
+    <string name="clip_clear_confirm">সংরক্ষিত %1$d টি ক্লিপ মুছে ফেলবেন? এটা ফেরানো যাবে না।</string>
+    <string name="clip_cleared">ক্লিপবোর্ড হিস্ট্রি মুছে ফেলা হয়েছে</string>
+    <string name="clip_copied">কপি হয়েছে</string>
+    <string name="clip_copied_all">পুরো লেখা কপি হয়েছে</string>
+    <string name="clip_nothing">কপি করার কিছু নেই</string>
+    <string name="clip_delete">এই ক্লিপটা মুছুন</string>
+    <string name="paste_nothing">পেস্ট করার কিছু নেই</string>
+    <string name="translate_loading">অনুবাদ হচ্ছে…</string>
+    <string name="translate_to_english">বাংলা → ইংরেজি</string>
+    <string name="translate_to_bangla">ইংরেজি → বাংলা</string>
+    <string name="translate_error">অনুবাদ ব্যর্থ। ইন্টারনেট দেখুন।</string>
+    <string name="translate_nothing">অনুবাদ করার কিছু নেই</string>
+    <string name="translate_insert">যোগ করুন</string>
+    <string name="translate_replace">বদলান</string>
+    <string name="translate_copy">কপি</string>
+    <string name="settings_editing">এডিটিং টুলবার</string>
+    <string name="settings_editing_desc">আনডো, রিডো, কপি, পেস্ট, ক্লিপবোর্ড হিস্ট্রি আর অনুবাদ — সাজেশন লাইনের উপরের সারিতে।</string>
+    <string name="settings_clipboard">ক্লিপবোর্ড হিস্ট্রি</string>
+    <string name="settings_clipboard_desc">আপনি যা কপি করেন সব এখানে থাকে, নিজে না মুছলে কিছুই মুছে যায় না — অ্যাপ বন্ধ করলেও থাকে। শুধু এই ফোনে, অ্যাপের নিজের স্টোরেজে।</string>
+    <string name="settings_clipboard_count">%1$d টি ক্লিপ সংরক্ষিত</string>
+    <string name="settings_clipboard_clear">সব ক্লিপ মুছুন</string>
+    <string name="settings_clipboard_empty">এখনো কোনো ক্লিপ নেই।</string>
+    <string name="opt_popup">কী প্রিভিউ</string>
+    <string name="opt_popup_desc">আঙুলের নিচের কী-টা বড় করে দেখায়।</string>
+    <string name="opt_number_row">সংখ্যার সারি</string>
+    <string name="opt_number_row_desc">অক্ষরের উপরে ০–৯ সারি।</string>
+    <string name="opt_double_space">ডাবল স্পেসে দাঁড়ি</string>
+    <string name="opt_double_space_desc">স্পেসে দুইবার চাপলে দাঁড়ি বসে।</string>
+    <string name="reset_height">উচ্চতা রিসেট</string>
 </resources>

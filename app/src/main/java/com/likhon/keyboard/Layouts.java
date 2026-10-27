@@ -45,7 +45,7 @@ final class Layouts {
     }
 
     static List<Row> build(int page, boolean bangla, boolean shift, boolean caps, boolean hints,
-                           String enterLabel, String spaceLabel, int emojiPage) {
+                           boolean numberRow, String enterLabel, String spaceLabel, int emojiPage) {
         switch (page) {
             case PAGE_SYMBOLS:
                 return symbols(bangla, enterLabel, spaceLabel, false);
@@ -57,15 +57,21 @@ final class Layouts {
                 return numeric(enterLabel, spaceLabel);
             case PAGE_LETTERS:
             default:
-                return letters(bangla, shift, caps, hints, enterLabel, spaceLabel);
+                return letters(bangla, shift, caps, hints, numberRow, enterLabel, spaceLabel);
         }
     }
 
     // ------------------------------------------------------------------ letters
 
     private static List<Row> letters(boolean bangla, boolean shift, boolean caps, boolean hints,
-                                     String enterLabel, String spaceLabel) {
-        List<Row> rows = new ArrayList<>(4);
+                                     boolean numberRow, String enterLabel, String spaceLabel) {
+        List<Row> rows = new ArrayList<>(5);
+        if (numberRow) {
+            rows.add(new Row(0f,
+                    Key.ch("1", 1f), Key.ch("2", 1f), Key.ch("3", 1f), Key.ch("4", 1f),
+                    Key.ch("5", 1f), Key.ch("6", 1f), Key.ch("7", 1f), Key.ch("8", 1f),
+                    Key.ch("9", 1f), Key.ch("0", 1f)));
+        }
 
         rows.add(new Row(0f, letterRow(ROW1, 0, shift, bangla, hints)));
         rows.add(new Row(0.5f, letterRow(ROW2, 10, shift, bangla, hints)));

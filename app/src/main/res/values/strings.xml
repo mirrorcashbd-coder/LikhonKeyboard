@@ -45,7 +45,7 @@
 
     <string name="section_about">About</string>
     <string name="about_body">Likhon is a small, offline keyboard. It has no ads and never sends anything anywhere; the microphone is used only for voice typing. English is a standard QWERTY layout; Bangla is phonetic, so you type the sound in English letters.</string>
-    <string name="about_version">Version 1.9</string>
+    <string name="about_version">Version 1.10</string>
     <string name="footer">Offline · No ads · Optional microphone</string>
     <string name="about_guide">Bangla typing guide</string>
 
@@ -123,4 +123,44 @@
     <string name="suggestion_forgotten">Removed from suggestions</string>
     <string name="voice_deleting">Deleting…</string>
     <string name="voice_deleted">Deleted</string>
+    <string name="action_undo">Undo</string>
+    <string name="action_redo">Redo</string>
+    <string name="action_clipboard">Clipboard history</string>
+    <string name="action_copy">Copy</string>
+    <string name="action_paste">Paste</string>
+    <string name="action_translate">Translate</string>
+    <string name="undo_unsupported">This app does not share its text, so undo is not possible here.</string>
+    <string name="clip_title">Clipboard</string>
+    <string name="clip_title_count">Clipboard · %1$d</string>
+    <string name="clip_empty">Nothing copied yet.</string>
+    <string name="clip_clear">Delete all</string>
+    <string name="clip_clear_confirm">Delete all %1$d saved clips? This cannot be undone.</string>
+    <string name="clip_cleared">Clipboard history cleared</string>
+    <string name="clip_copied">Copied</string>
+    <string name="clip_copied_all">Whole field copied</string>
+    <string name="clip_nothing">Nothing to copy</string>
+    <string name="clip_delete">Delete this clip</string>
+    <string name="paste_nothing">Nothing to paste</string>
+    <string name="translate_loading">Translating…</string>
+    <string name="translate_to_english">Bangla → English</string>
+    <string name="translate_to_bangla">English → Bangla</string>
+    <string name="translate_error">Translation failed. Check the connection.</string>
+    <string name="translate_nothing">Nothing to translate</string>
+    <string name="translate_insert">Insert</string>
+    <string name="translate_replace">Replace</string>
+    <string name="translate_copy">Copy</string>
+    <string name="settings_editing">Editing toolbar</string>
+    <string name="settings_editing_desc">Undo, redo, copy, paste, clipboard history and translate sit in the row above the suggestions.</string>
+    <string name="settings_clipboard">Clipboard history</string>
+    <string name="settings_clipboard_desc">Every text you copy is kept here until you delete it, even after a restart. Stored only on this phone, in the app’s private storage.</string>
+    <string name="settings_clipboard_count">%1$d clips saved</string>
+    <string name="settings_clipboard_clear">Delete all clips</string>
+    <string name="settings_clipboard_empty">No clips saved yet.</string>
+    <string name="opt_popup">Key preview</string>
+    <string name="opt_popup_desc">Shows a larger copy of the key under your finger.</string>
+    <string name="opt_number_row">Number row</string>
+    <string name="opt_number_row_desc">A row of digits above the letters.</string>
+    <string name="opt_double_space">Double-space period</string>
+    <string name="opt_double_space_desc">Two taps on space put a full stop and a space.</string>
+    <string name="reset_height">Reset height</string>
 </resources>

@@ -21,6 +21,9 @@ final class Prefs {
     static final String KEY_VOICE_CLEANUP = "voice_cleanup";
     static final String KEY_VOICE_ENGINE = "voice_engine";
     static final String KEY_HEIGHT = "keyboard_height";
+    static final String KEY_POPUP = "key_popup";
+    static final String KEY_NUMBER_ROW = "number_row";
+    static final String KEY_DOUBLE_SPACE = "double_space";
 
     /** Voice language follows the typing language. */
     static final String VOICE_AUTO = "auto";
@@ -98,6 +101,18 @@ final class Prefs {
 
     void setVoiceEngine(String value) {
         sp.edit().putString(KEY_VOICE_ENGINE, value == null ? "" : value).apply();
+    }
+
+    boolean showPopup() {
+        return sp.getBoolean(KEY_POPUP, true);
+    }
+
+    boolean numberRow() {
+        return sp.getBoolean(KEY_NUMBER_ROW, false);
+    }
+
+    boolean doubleSpace() {
+        return sp.getBoolean(KEY_DOUBLE_SPACE, false);
     }
 
     /** Keyboard size as a fraction of the calculated height (0.5 – 2.2). */

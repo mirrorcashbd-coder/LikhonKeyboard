@@ -60,6 +60,10 @@ public class SettingsActivity extends Activity {
     private TextView enableButton;
     private TextView chooseButton;
 
+    /** Opens settings straight at a section (the gear in the keyboard toolbar). */
+    static final String EXTRA_PANEL = "panel";
+    static final String PANEL_EDITING = "editing";
+
     private TextView chipEnglish;
     private TextView chipBangla;
     private LinearLayout themeChips;
@@ -70,6 +74,7 @@ public class SettingsActivity extends Activity {
     private TextView micTestResult;
     private TextView voiceTestResult;
     private TextView voiceLogView;
+    private TextView clipStoreCount;
     private SpeechRecognizer speechTest;
     private final Handler testHandler = new Handler(Looper.getMainLooper());
     private final Runnable speechTimeout = () ->
@@ -96,6 +101,33 @@ public class SettingsActivity extends Activity {
         refreshStatus();
         refreshVoiceStatus();
         refreshVoiceLog();
+        refreshClipStore();
+    }
+
+    private void refreshClipStore() {
+        if (clipStoreCount == null) {
+            return;
+        }
+        int count = new ClipStore(this).size();
+        clipStoreCount.setText(count == 0
+                ? getString(R.string.settings_clipboard_empty)
+                : getString(R.string.settings_clipboard_count, count));
+    }
+
+    private void confirmClearClipStore() {
+        final ClipStore store = new ClipStore(this);
+        if (store.size() == 0) {
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.settings_clipboard)
+                .setMessage(getString(R.string.clip_clear_confirm, store.size()))
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.clip_clear, (dialog, which) -> {
+                    store.clear();
+                    refreshClipStore();
+                })
+                .show();
     }
 
     private void configureWindow() {
@@ -236,6 +268,30 @@ public class SettingsActivity extends Activity {
         addSection(root, getString(R.string.section_voice),
                 getString(R.string.section_voice_desc), buildVoiceCard());
 
+        // ----------------------------------------------------- editing card
+        LinearLayout editingCard = Ui.card(this, palette);
+        TextView editingNote = Ui.text(this, getString(R.string.settings_editing_desc), 13,
+                palette.textMuted, false);
+        editingCard.addView(editingNote);
+        addSection(root, getString(R.string.settings_editing), null, editingCard);
+
+        // --------------------------------------------------- clipboard card
+        LinearLayout clipCard = Ui.card(this, palette);
+        TextView clipNote = Ui.text(this, getString(R.string.settings_clipboard_desc), 13,
+                palette.textMuted, false);
+        clipCard.addView(clipNote);
+        LinearLayout clipRow = Ui.horizontal(this);
+        clipStoreCount = Ui.text(this, "", 13, palette.text, true);
+        clipStoreCount.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        clipRow.addView(clipStoreCount);
+        clipRow.addView(Ui.button(this, palette,
+                getString(R.string.settings_clipboard_clear), false,
+                this::confirmClearClipStore));
+        addWithTopMargin(clipCard, clipRow, 14);
+        addSection(root, getString(R.string.settings_clipboard), null, clipCard);
+        refreshClipStore();
+
         // -------------------------------------------------- appearance card
         LinearLayout themeCard = Ui.card(this, palette);
         themeChips = Ui.horizontal(this);
@@ -253,6 +309,22 @@ public class SettingsActivity extends Activity {
                 Prefs.KEY_AUTOCAP, prefs.autoCap());
         addSwitchRow(typingCard, R.string.opt_hints, R.string.opt_hints_desc,
                 Prefs.KEY_HINTS, prefs.hints());
+        addSwitchRow(typingCard, R.string.opt_popup, R.string.opt_popup_desc,
+                Prefs.KEY_POPUP, prefs.showPopup());
+        addSwitchRow(typingCard, R.string.opt_number_row, R.string.opt_number_row_desc,
+                Prefs.KEY_NUMBER_ROW, prefs.numberRow());
+        addSwitchRow(typingCard, R.string.opt_double_space, R.string.opt_double_space_desc,
+                Prefs.KEY_DOUBLE_SPACE, prefs.doubleSpace());
+
+        LinearLayout heightRow = Ui.horizontal(this);
+        TextView heightLabel = Ui.text(this, getString(R.string.reset_height), 13,
+                palette.text, true);
+        heightLabel.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        heightRow.addView(heightLabel);
+        heightRow.addView(Ui.button(this, palette, getString(R.string.reset_height), false,
+                () -> prefs.setHeightScale(1f)));
+        addWithTopMargin(typingCard, heightRow, 14);
         addSection(root, getString(R.string.section_typing), null, typingCard);
 
         // ------------------------------------------------------- about card

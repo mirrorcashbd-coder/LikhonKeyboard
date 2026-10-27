@@ -6,14 +6,14 @@ no AndroidX, no third-party libraries, no ads, and nothing of its own ever goes
 online (the `INTERNET` permission is declared only for speech services that run
 inside the calling app).
 
-**APK:** `build/manual/LikhonKeyboard-1.9.apk` (also copied to
-`/sdcard/Download/LikhonKeyboard-1.9.apk`)
+**APK:** `build/manual/LikhonKeyboard-1.10.apk` (also copied to
+`/sdcard/Download/LikhonKeyboard-1.10.apk`)
 
 ---
 
 ## Install
 
-1. Open `LikhonKeyboard-1.9.apk` in the Files app and allow "install unknown apps"
+1. Open `LikhonKeyboard-1.10.apk` in the Files app and allow "install unknown apps"
    for that app if asked.
 2. Open **Likhon Keyboard** from the app drawer.
 3. Tap **Enable keyboard** → turn on "Likhon Keyboard".
@@ -112,6 +112,31 @@ need the Bangla language pack downloaded in that app, and some phones only do
 recognition online. The keyboard itself never sends anything anywhere: the
 `INTERNET` permission exists only because some speech services run in the
 calling app and need it to reach their own servers.
+
+## Editing toolbar
+
+A thin row above the suggestions holds the editing tools:
+
+- **↩ / ↪ Undo / redo.** Snapshots of the field are taken before every edit;
+  fast typing is merged, so undo works a word at a time. Apps that do not hand
+  their text to input methods (some browsers and WebViews) simply leave the
+  buttons dim.
+- **📋 Clipboard history.** Every text copied while the keyboard is on screen is
+  stored, newest first, in `files/clipboard.txt` inside the app's private
+  storage. Nothing is ever removed automatically: the list survives restarts
+  and grows until a single clip or the whole list is deleted from the panel. Tap
+  a clip to insert it, `✕` to delete that one. Password fields are never
+  captured.
+- **📄 Copy / ⬇ Paste.** Copy uses the selection, or the whole field when
+  nothing is selected; paste inserts the system clipboard, falling back to the
+  newest saved clip.
+- **🌐 Translate.** Translates the selection, the word, or a short field:
+  Bangla → English when the text is Bangla, English → Bangla otherwise. The
+  result can be inserted, used to replace the source, or copied.
+- **⚙ Settings.**
+
+The clipboard panel and the translator share one strip under the suggestions,
+so the keyboard never leaves the screen for them either.
 
 ## Word suggestions
 
@@ -213,7 +238,7 @@ equivalent ARM64 build script is included. It uses the Ubuntu/Debian
 tools/build-apk-arm64.sh
 ```
 
-Output: `build/manual/LikhonKeyboard-1.9.apk` (signed with the debug key in
+Output: `build/manual/LikhonKeyboard-1.10.apk` (signed with the debug key in
 `keystore/likhon-debug.jks`, generated on first run — keep that file if you want
 future builds to install over the current one).
 
@@ -262,6 +287,22 @@ finger (key, long-press timer, delete-repeat timer), which is what allows
 simultaneous presses.
 
 ## Changes
+
+**1.10**
+
+- New editing toolbar above the suggestions: undo, redo, copy, paste, clipboard
+  history, translate and settings.
+- **Clipboard history** stores every copy in a private file, newest first, and
+  never deletes anything on its own; entries can be removed one by one or all at
+  once. It is filled while the keyboard is visible, skips password fields, and
+  survives restarts and updates.
+- **Undo/redo** by text snapshots (a word per step), working in any editor that
+  exposes its text through `ExtractedText`.
+- **Translate** Bangla ↔ English with the public Google Translate endpoint,
+  inserting, replacing or copying the result. Only the chosen text is sent, and
+  only when the button is pressed.
+- Settings gained a clipboard card (count and delete-all) and typing options:
+  key preview, number row, double-space period, and a height reset.
 
 **1.9**
 
@@ -395,6 +436,12 @@ simultaneous presses.
   count as punctuation only at the end of a phrase (they are common nouns).
 - The custom keyboard view is not fully accessible to TalkBack; keys are not
   exposed as individual accessibility nodes.
+- Undo needs the editor to return its text to input methods. Where it does not,
+  the undo button stays dim instead of half-working.
+- Clipboard history only captures what is copied while the keyboard is open
+  (Android hides the clipboard from background apps otherwise).
+- Translate needs a connection and uses the public Google endpoint; the text you
+  translate leaves the phone, nothing else does.
 - Phonetic Bangla is rule-based, not a full dictionary. Very irregular words can
   come out wrong; add them to `WordDictionary.java`.
 - `j` types জ. For য use the dictionary words (jodi, jabe, jibon) or type `z`.
