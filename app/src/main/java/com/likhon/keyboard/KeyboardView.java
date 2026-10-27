@@ -182,6 +182,16 @@ public class KeyboardView extends View {
         invalidate();
     }
 
+    /** Current row height, for the drag-to-resize handle. */
+    float getRowHeightDp() {
+        return rowHeightPx / density;
+    }
+
+    /** How many rows the current page has (usually four). */
+    int getRowCount() {
+        return Math.max(1, layoutRows.size());
+    }
+
     void setKeys(List<Layouts.Row> newRows) {
         layoutRows = newRows == null ? Collections.<Layouts.Row>emptyList() : newRows;
         layoutSerial++;

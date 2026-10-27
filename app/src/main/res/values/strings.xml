@@ -45,7 +45,7 @@
 
     <string name="section_about">About</string>
     <string name="about_body">Likhon is a small, offline keyboard. It has no ads and never sends anything anywhere; the microphone is used only for voice typing. English is a standard QWERTY layout; Bangla is phonetic, so you type the sound in English letters.</string>
-    <string name="about_version">Version 1.2</string>
+    <string name="about_version">Version 1.3</string>
     <string name="footer">Offline · No ads · Optional microphone</string>
     <string name="about_guide">Bangla typing guide</string>
 
@@ -91,4 +91,7 @@
     <string name="opt_voice_cleanup">Clean up speech</string>
     <string name="opt_voice_cleanup_desc">Removes “um”, “উম”, stutters and repeated words.</string>
     <string name="voice_note">Recognition is done by your phone’s speech service (usually Google). Bangla may need a downloaded language or a connection; this app itself never goes online.</string>
+    <string name="resize_hint">Drag to resize the keyboard</string>
+    <string name="resize_reset">Keyboard size reset</string>
+    <string name="suggestion_forgotten">Removed from suggestions</string>
 </resources>

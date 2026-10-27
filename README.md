@@ -4,14 +4,14 @@ A small, fast, **offline** Android keyboard with an English QWERTY layout and
 phonetic Bangla typing. Written in plain Java against the Android framework:
 no AndroidX, no third-party libraries, no internet permission, no ads.
 
-**APK:** `build/manual/LikhonKeyboard-1.1.apk` (also copied to
-`/sdcard/Download/LikhonKeyboard-1.1.apk`)
+**APK:** `build/manual/LikhonKeyboard-1.3.apk` (also copied to
+`/sdcard/Download/LikhonKeyboard-1.3.apk`)
 
 ---
 
 ## Install
 
-1. Open `LikhonKeyboard-1.1.apk` in the Files app and allow "install unknown apps"
+1. Open `LikhonKeyboard-1.3.apk` in the Files app and allow "install unknown apps"
    for that app if asked.
 2. Open **Likhon Keyboard** from the app drawer.
 3. Tap **Enable keyboard** → turn on "Likhon Keyboard".
@@ -43,10 +43,15 @@ the keyboard to open settings at any time.
 - **Numeric keyboard** for number and phone fields.
 - **Bangla digits**, `।`, `ঁ`, `্` and `৳` in Bangla mode.
 - **Voice typing** in Bangla, Banglish and English (see below).
-- **Word suggestions** while you type: a scrollable strip above the keys with
-  up to 18 completions. English uses the 10,000 most common words, Bangla uses
-  18,000 words matched against what you type in roman letters, so `bhal` offers
-  ভালো, ভালোবাসা, ভালোবাসি…
+- **Word suggestions, always on**: a scrollable strip above the keys with up
+  to 18 completions, visible even before the first letter. English uses the
+  10,000 most common words, Bangla uses 18,000 words matched against what you
+  type in roman letters, so `bhal` offers ভালো, ভালোবাসা, ভালোবাসি…
+- **Learns your words**: every word you finish typing, pick or dictate is
+  remembered locally and comes back in the strip, even when it is not in the
+  bundled lists.
+- **Resizable keyboard**: drag the grip above the keys up or down to make the
+  keyboard taller or shorter; long-press the grip to reset it.
 - English **and** Bangla UI (follows the phone language).
 - Typing and suggestions are fully offline. The only permission is the
   microphone, and it is used only while voice typing is running.
@@ -75,16 +80,45 @@ anything anywhere and has no internet permission.
 
 ## Word suggestions
 
-The strip above the keys shows completions for the word being typed.
+The strip above the keys is always there on the letters and symbols pages.
 
-- In **English**, the 10,000 most frequent words are searched by prefix, so
+- **Nothing typed yet**: your recently used words come first, then the most
+  common words of the current language, so the strip is never empty.
+- **In English**, the 10,000 most frequent words are searched by prefix, so
   `hel` gives hello, help, held, helpful… in frequency order.
-- In **Bangla**, suggestions follow the *roman* letters you type, not the
+- **In Bangla**, suggestions follow the *roman* letters you type, not the
   converted text: `kemon` → কেমন, `bhal` → ভালো, ভালোবাসা… This list is built
   from a public-domain word list and romanised once at build time
   (`tools/build-suggestions.sh`), so there is no work to do while typing.
+- **New words are learned**: when you finish a word (space, enter, punctuation,
+  a suggestion or dictation), it is stored in
+  `files/learned_words.txt` and appears at the front of the strip from then on.
+  Bangla words remember the roman letters that produced them, so typing `amar`
+  suggests আপনার নিজের লেখা `আমার` again.
 - Tap a suggestion to replace the word being typed and add a space.
-- Suggestions are hidden for password fields and number fields.
+- Long-press a suggestion to forget a learned word.
+- Suggestions are hidden for password and number fields, and on the emoji page.
+
+## Keyboard size
+
+The thin grip between the suggestion strip and the keys changes the keyboard
+height:
+
+- drag it up to make the keys taller, down to make them shorter;
+- the text on the keys scales with them;
+- long-press the grip to go back to the default size.
+
+The chosen size is remembered across restarts (`Prefs.KEY_HEIGHT`), from 26 to
+92 dp per row.
+
+## PixelBoard
+
+[PixelBoard](https://github.com/Akshayykadam/PixelBoard) is a **GPL-3.0 mod of
+Gboard**: it is a set of Morphe/ReVanced patches that rewrite Google's Gboard
+APK, not a keyboard implementation. It cannot be merged into Likhon (different
+app, GPL-3.0, and no source for the keyboard itself). Its ideas that fit here —
+always-on suggestions, learning what you type, and a resizable keyboard — were
+implemented from scratch in this project instead.
 
 ## Bangla typing guide
 
@@ -131,7 +165,7 @@ equivalent ARM64 build script is included. It uses the Ubuntu/Debian
 tools/build-apk-arm64.sh
 ```
 
-Output: `build/manual/LikhonKeyboard-1.2.apk` (signed with the debug key in
+Output: `build/manual/LikhonKeyboard-1.3.apk` (signed with the debug key in
 `keystore/likhon-debug.jks`, generated on first run — keep that file if you want
 future builds to install over the current one).
 
@@ -161,6 +195,8 @@ app/src/main/java/com/likhon/keyboard/
   VoiceInput.java       SpeechRecognizer wrapper, continuous dictation
   VoiceText.java        filler/stutter cleanup for dictated text
   Suggestions.java      prefix search over the two bundled word lists
+  LearnedWords.java     persistence for words the person actually types
+  LearnedIndex.java     the pure add/suggest/remove logic behind it
   Palette.java          light/dark colours
   Prefs.java            typed SharedPreferences
   SettingsActivity.java setup + settings screen (code-built UI)
@@ -178,6 +214,18 @@ finger (key, long-press timer, delete-repeat timer), which is what allows
 simultaneous presses.
 
 ## Changes
+
+**1.3**
+
+- The suggestion strip is always visible: recent/learned words first, then the
+  most common words of the current language, even before the first letter.
+- New words are learned automatically when finished (space, enter, punctuation,
+  suggestion tap or dictation), kept on disk and offered again later. Bangla
+  words remember the roman spelling that produced them; long-press a chip to
+  forget one.
+- Drag the grip above the keys to resize the keyboard; long-press it to reset.
+  The size is remembered.
+- `tools/LearnedCheck.java` checks the learning logic on a plain JDK.
 
 **1.2**
 
@@ -201,9 +249,10 @@ simultaneous presses.
 
 ## Known limits
 
-- Suggestions are prefix-only: no next-word prediction, no learning from what
-  you type, and no auto-correction. Bangla suggestions can only offer words in
-  the bundled list, and only when they start with the letters you typed.
+- Suggestions are prefix-only: no next-word prediction and no auto-correction.
+  Learner words are matched by prefix too, and only within the current language.
+- Learned words are stored unencrypted in the app's private files directory;
+  they never leave the phone.
 - Voice typing depends on the phone's speech service; it does nothing if none
   is installed, and Bangla needs a Bangla language pack.
 - The custom keyboard view is not fully accessible to TalkBack; keys are not

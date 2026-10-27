@@ -19,6 +19,7 @@ final class Prefs {
     static final String KEY_VOICE_BANGLISH = "voice_banglish";
     static final String KEY_VOICE_CONTINUOUS = "voice_continuous";
     static final String KEY_VOICE_CLEANUP = "voice_cleanup";
+    static final String KEY_HEIGHT = "keyboard_height";
 
     /** Voice language follows the typing language. */
     static final String VOICE_AUTO = "auto";
@@ -87,6 +88,25 @@ final class Prefs {
 
     boolean voiceCleanup() {
         return sp.getBoolean(KEY_VOICE_CLEANUP, true);
+    }
+
+    /** Keyboard size as a fraction of the calculated height (0.5 – 2.2). */
+    float heightScale() {
+        return clampScale(sp.getFloat(KEY_HEIGHT, 1f));
+    }
+
+    void setHeightScale(float value) {
+        sp.edit().putFloat(KEY_HEIGHT, clampScale(value)).apply();
+    }
+
+    private static float clampScale(float value) {
+        if (value < 0.5f) {
+            return 0.5f;
+        }
+        if (value > 2.2f) {
+            return 2.2f;
+        }
+        return value;
     }
 
     boolean getBoolean(String key, boolean fallback) {

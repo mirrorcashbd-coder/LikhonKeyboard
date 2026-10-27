@@ -45,7 +45,7 @@
 
     <string name="section_about">সম্পর্কে</string>
     <string name="about_body">লিখন একটি ছোট, অফলাইন কীবোর্ড। এতে বিজ্ঞাপন নেই এবং কোথাও কিছু পাঠায় না; মাইক্রোফোন কেবল ভয়েস টাইপিংয়ে ব্যবহার হয়। ইংরেজি সাধারণ QWERTY লেআউট; বাংলা ফোনেটিক, অর্থাৎ ইংরেজি অক্ষরে যেভাবে উচ্চারণ হয় সেভাবে লিখলেই বাংলা হয়।</string>
-    <string name="about_version">সংস্করণ ১.২</string>
+    <string name="about_version">সংস্করণ ১.৩</string>
     <string name="footer">অফলাইন · বিজ্ঞাপন নেই · মাইক অনুমতি ঐচ্ছিক</string>
     <string name="about_guide">বাংলা টাইপিং নির্দেশিকা</string>
 
@@ -91,4 +91,7 @@
     <string name="opt_voice_cleanup">কথা পরিষ্কার করবে</string>
     <string name="opt_voice_cleanup_desc">“উম”, “um”, আটকে যাওয়া ও একই শব্দ বারবার বলা বাদ দেবে।</string>
     <string name="voice_note">রিকগনিশন ফোনের স্পিচ সার্ভিস (সাধারণত Google) করে। বাংলার জন্য ভাষা ডাউনলোড বা ইন্টারনেট লাগতে পারে; অ্যাপ নিজে ইন্টারনেটে যায় না।</string>
+    <string name="resize_hint">কীবোর্ডের আকার বদলাতে টেনে দেখুন</string>
+    <string name="resize_reset">কীবোর্ডের আকার আগের মতো হলো</string>
+    <string name="suggestion_forgotten">সাজেশন থেকে বাদ দেওয়া হলো</string>
 </resources>

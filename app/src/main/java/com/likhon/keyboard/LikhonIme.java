@@ -12,16 +12,19 @@ import android.text.InputType;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
+import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 
@@ -51,9 +54,15 @@ public class LikhonIme extends InputMethodService
     private boolean voicePreviewing;
 
     private Suggestions suggestions;
+    private LearnedWords learned;
     private HorizontalScrollView candidateScroll;
     private LinearLayout candidateRow;
+    private View resizeHandle;
+    private View gripView;
+    private float baseRowHeightDp = 48f;
     private String lastSuggestionKey = "";
+
+    private static final int MAX_SUGGESTIONS = 18;
 
     private boolean bangla;
     private boolean shift;
@@ -102,17 +111,22 @@ public class LikhonIme extends InputMethodService
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         suggestions = new Suggestions(this);
+        learned = new LearnedWords(this);
         candidateScroll = buildCandidateBar();
         root.addView(candidateScroll, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         voicePanel = buildVoicePanel();
         root.addView(voicePanel, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        resizeHandle = buildResizeHandle();
+        root.addView(resizeHandle, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(14)));
         root.addView(keyboardView, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         builtSignature = null;
         applyPreferences();
+        applyRowHeight();
         refreshLayout();
         // Read the word lists once, off the typing path.
         candidateScroll.post(new Runnable() {
@@ -180,6 +194,89 @@ public class LikhonIme extends InputMethodService
         return scroll;
     }
 
+    /**
+     * A thin grip between the suggestions and the keys. Drag it up or down to
+     * change the keyboard height; long-press it to go back to the default size.
+     * The chosen size survives restarts in {@link Prefs#heightScale()}.
+     */
+    private View buildResizeHandle() {
+        FrameLayout handle = new FrameLayout(this);
+        handle.setContentDescription(getString(R.string.resize_hint));
+        gripView = new View(this);
+        gripView.setBackground(Ui.rounded(this, palette.keySpecial, 2));
+        FrameLayout.LayoutParams gripParams = new FrameLayout.LayoutParams(
+                dp(46), dp(4), Gravity.CENTER);
+        handle.addView(gripView, gripParams);
+        handle.setOnTouchListener(new View.OnTouchListener() {
+            private float startRawY;
+            private float startRowDp;
+            private boolean moved;
+            private final Runnable reset = new Runnable() {
+                @Override
+                public void run() {
+                    prefs.setHeightScale(1f);
+                    applyRowHeight();
+                    startRowDp = keyboardView.getRowHeightDp();
+                    Toast.makeText(LikhonIme.this, R.string.resize_reset,
+                            Toast.LENGTH_SHORT).show();
+                }
+            };
+
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        startRawY = event.getRawY();
+                        startRowDp = keyboardView.getRowHeightDp();
+                        moved = false;
+                        v.postDelayed(reset, 700);
+                        return true;
+                    case MotionEvent.ACTION_MOVE:
+                        float dyDp = (event.getRawY() - startRawY)
+                                / getResources().getDisplayMetrics().density;
+                        if (!moved && Math.abs(dyDp) > 5f) {
+                            moved = true;
+                            v.removeCallbacks(reset);
+                        }
+                        if (moved) {
+                            float rows = keyboardView.getRowCount();
+                            keyboardView.setRowHeightDp(clampRow(startRowDp - dyDp / rows));
+                        }
+                        return true;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        v.removeCallbacks(reset);
+                        if (moved && baseRowHeightDp > 0f) {
+                            prefs.setHeightScale(keyboardView.getRowHeightDp()
+                                    / baseRowHeightDp);
+                        }
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+        });
+        return handle;
+    }
+
+    private void applyRowHeight() {
+        if (keyboardView == null) {
+            return;
+        }
+        baseRowHeightDp = computeRowHeightDp();
+        keyboardView.setRowHeightDp(clampRow(baseRowHeightDp * prefs.heightScale()));
+    }
+
+    private static float clampRow(float rowDp) {
+        if (rowDp < 26f) {
+            return 26f;
+        }
+        if (rowDp > 92f) {
+            return 92f;
+        }
+        return rowDp;
+    }
+
     @Override
     public boolean onEvaluateFullscreenMode() {
         // Never take over the whole screen in landscape.
@@ -207,18 +304,22 @@ public class LikhonIme extends InputMethodService
         super.onStartInputView(info, restarting);
         applyPreferences();
         if (keyboardView != null) {
-            keyboardView.setRowHeightDp(computeRowHeightDp());
+            applyRowHeight();
         }
         if (!restarting) {
             shift = autoShiftForNewField() && !bangla;
         }
         refreshLayout();
+        updateSuggestions();
     }
 
     @Override
     public void onFinishInputView(boolean finishingInput) {
         finishWord();
         hideCandidates();
+        if (learned != null) {
+            learned.flush();
+        }
         stopVoice(true);
         if (voice != null) {
             voice.destroy();
@@ -232,7 +333,7 @@ public class LikhonIme extends InputMethodService
         super.onConfigurationChanged(newConfig);
         if (keyboardView != null) {
             applyPreferences();
-            keyboardView.setRowHeightDp(computeRowHeightDp());
+            applyRowHeight();
             builtSignature = null;
             refreshLayout();
         }
@@ -325,6 +426,12 @@ public class LikhonIme extends InputMethodService
         keyboardView.setPalette(palette);
         keyboardView.setFeedback(prefs.haptic(), prefs.sound());
         styleVoicePanel();
+        if (resizeHandle != null) {
+            resizeHandle.setBackgroundColor(palette.bg);
+        }
+        if (gripView != null) {
+            gripView.setBackground(Ui.rounded(this, palette.keySpecial, 2));
+        }
     }
 
     // ------------------------------------------------------------- the layout
@@ -358,22 +465,24 @@ public class LikhonIme extends InputMethodService
                 updateSuggestions();
                 break;
             case Key.SPACE:
+                learnCurrentWord();
                 finishWord();
                 commit(" ");
                 afterTyped(" ");
-                hideCandidates();
+                updateSuggestions();
                 break;
             case Key.DELETE:
                 backspace();
                 updateSuggestions();
                 break;
             case Key.ENTER:
+                learnCurrentWord();
                 finishWord();
-                hideCandidates();
                 if (!sendDefaultEditorAction(true)) {
                     commit("\n");
                     afterTyped("\n");
                 }
+                updateSuggestions();
                 break;
             case Key.SHIFT:
                 toggleShift();
@@ -383,7 +492,6 @@ public class LikhonIme extends InputMethodService
                 break;
             case Key.SYMBOLS:
                 finishWord();
-                hideCandidates();
                 if (page == Layouts.PAGE_MORE) {
                     page = Layouts.PAGE_SYMBOLS;
                 } else if (page == Layouts.PAGE_SYMBOLS) {
@@ -392,6 +500,7 @@ public class LikhonIme extends InputMethodService
                     page = Layouts.PAGE_SYMBOLS;
                 }
                 refreshLayout();
+                updateSuggestions();
                 break;
             case Key.MORE:
                 hideCandidates();
@@ -400,9 +509,9 @@ public class LikhonIme extends InputMethodService
                 break;
             case Key.LETTERS:
                 finishWord();
-                hideCandidates();
                 page = Layouts.PAGE_LETTERS;
                 refreshLayout();
+                updateSuggestions();
                 break;
             case Key.EMOJI:
                 finishWord();
@@ -443,6 +552,10 @@ public class LikhonIme extends InputMethodService
             return;
         }
         char first = text.charAt(0);
+        if (!Phonetic.isLetter(first)) {
+            // A separator ("." "," "!" or a symbol) ends the word before it.
+            learnCurrentWord();
+        }
         if (bangla && Phonetic.isLetter(first)) {
             rawWord.append(text);
             composing = true;
@@ -533,7 +646,6 @@ public class LikhonIme extends InputMethodService
 
     private void toggleLanguage() {
         finishWord();
-        hideCandidates();
         bangla = !bangla;
         prefs.setBangla(bangla);
         shift = false;
@@ -541,6 +653,8 @@ public class LikhonIme extends InputMethodService
         page = numeric ? Layouts.PAGE_NUMERIC : Layouts.PAGE_LETTERS;
         emojiPage = 0;
         refreshLayout();
+        lastSuggestionKey = "";
+        updateSuggestions();
     }
 
     private void afterTyped(String text) {
@@ -595,6 +709,42 @@ public class LikhonIme extends InputMethodService
         return sb.toString();
     }
 
+    // --------------------------------------------------------------- learning
+
+    /** Adds the word just finished to the learned list. */
+    private void learnCurrentWord() {
+        if (learned == null || isSensitiveField()) {
+            return;
+        }
+        if (bangla && composing) {
+            learned.add(lastComposed, rawWord.toString());
+            return;
+        }
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) {
+            return;
+        }
+        CharSequence before = ic.getTextBeforeCursor(40, 0);
+        if (before == null || before.length() == 0) {
+            return;
+        }
+        learned.add(lastWordIn(before), null);
+    }
+
+    private static String lastWordIn(CharSequence text) {
+        int end = text.length();
+        int start = end;
+        while (start > 0) {
+            char c = text.charAt(start - 1);
+            if (Character.isLetter(c) || c == '\'') {
+                start--;
+            } else {
+                break;
+            }
+        }
+        return text.subSequence(start, end).toString();
+    }
+
     // ------------------------------------------------------------------ voice
 
     private void toggleVoice() {
@@ -646,6 +796,8 @@ public class LikhonIme extends InputMethodService
         if (voicePanel != null) {
             voicePanel.setVisibility(View.GONE);
         }
+        lastSuggestionKey = "";
+        updateSuggestions();
     }
 
     private String voiceLanguage() {
@@ -787,6 +939,11 @@ public class LikhonIme extends InputMethodService
         }
         voicePreviewing = false;
         commit(converted + " ");
+        if (learned != null) {
+            for (String word : converted.split("[\\s,.;:!?।]+")) {
+                learned.add(word, null);
+            }
+        }
         if (voiceStatus != null) {
             voiceStatus.setText(converted);
         }
@@ -808,6 +965,8 @@ public class LikhonIme extends InputMethodService
         if (voicePanel != null) {
             voicePanel.setVisibility(View.GONE);
         }
+        lastSuggestionKey = "";
+        updateSuggestions();
     }
 
     @Override
@@ -838,34 +997,27 @@ public class LikhonIme extends InputMethodService
 
     // ------------------------------------------------------------ suggestions
 
+    /**
+     * Rebuilds the strip. It is deliberately never empty on a typing page: with
+     * no prefix it shows learned words first and then the most common words, so
+     * suggestions are available before the first letter as well.
+     */
     private void updateSuggestions() {
-        if (candidateRow == null) {
+        if (candidateRow == null || learned == null) {
             return;
         }
-        // Work out what is being typed first; only then touch the list. The
-        // same prefix is often reported twice (typing and the app's selection
-        // callback), and rebuilding 18 chips twice per key is wasteful.
-        String key;
-        List<String> words;
-        if (bangla) {
-            if (!composing || rawWord.length() < 2) {
-                hideCandidates();
-                return;
-            }
-            key = "B" + rawWord;
-            words = null;
-        } else if (numeric || page != Layouts.PAGE_LETTERS || isSensitiveField()) {
+        boolean typingPage = page == Layouts.PAGE_LETTERS || page == Layouts.PAGE_SYMBOLS;
+        if (numeric || !typingPage || isSensitiveField()) {
             hideCandidates();
             return;
-        } else {
-            String typed = currentWordBeforeCursor();
-            if (typed.isEmpty()) {
-                hideCandidates();
-                return;
-            }
-            key = "E" + typed;
-            words = null;
         }
+        String prefix;
+        if (bangla) {
+            prefix = composing ? rawWord.toString() : "";
+        } else {
+            prefix = currentWordBeforeCursor();
+        }
+        String key = (bangla ? "B" : "E") + (shift ? "^" : "") + prefix;
         if (key.equals(lastSuggestionKey) && candidateScroll != null
                 && candidateScroll.getVisibility() == View.VISIBLE) {
             return;
@@ -874,20 +1026,47 @@ public class LikhonIme extends InputMethodService
         if (suggestions == null) {
             suggestions = new Suggestions(this);
         }
-        if (bangla) {
-            words = suggestions.bangla(rawWord.toString());
+
+        List<String> merged = new ArrayList<>();
+        merged.addAll(learned.suggest(prefix, bangla, 8));
+        List<String> base;
+        if (prefix.isEmpty()) {
+            base = suggestions.popular(bangla, MAX_SUGGESTIONS);
+        } else if (bangla) {
+            base = suggestions.bangla(prefix);
         } else {
-            String typed = currentWordBeforeCursor();
-            words = suggestions.english(typed);
-            if (!words.isEmpty() && Character.isUpperCase(typed.charAt(0))) {
-                List<String> cased = new ArrayList<>(words.size());
-                for (String word : words) {
+            base = suggestions.english(prefix);
+        }
+        LinkedHashSet<String> unique = new LinkedHashSet<>(merged);
+        unique.addAll(base);
+        merged = new ArrayList<>(unique);
+
+        // Never offer the word that is already in the editor.
+        String current = bangla ? (composing ? lastComposed : "") : prefix;
+        if (!current.isEmpty()) {
+            merged.remove(current);
+        }
+        if (merged.isEmpty()) {
+            // Nothing matched: keep the promise that suggestions are always
+            // there by falling back to common words.
+            merged = suggestions.popular(bangla, MAX_SUGGESTIONS);
+        }
+        if (!bangla && !merged.isEmpty()) {
+            boolean capital = !prefix.isEmpty()
+                    ? Character.isUpperCase(prefix.charAt(0))
+                    : shift;
+            if (capital) {
+                List<String> cased = new ArrayList<>(merged.size());
+                for (String word : merged) {
                     cased.add(capitalised(word));
                 }
-                words = cased;
+                merged = cased;
             }
         }
-        showCandidates(words);
+        if (merged.size() > MAX_SUGGESTIONS) {
+            merged = new ArrayList<>(merged.subList(0, MAX_SUGGESTIONS));
+        }
+        showCandidates(merged);
     }
 
     private void showCandidates(List<String> words) {
@@ -908,6 +1087,15 @@ public class LikhonIme extends InputMethodService
             chip.setPadding(dp(12), dp(7), dp(12), dp(7));
             chip.setBackground(Ui.ripple(this, palette.keyBg, 9, palette.accent));
             chip.setOnClickListener(v -> pickSuggestion(word));
+            chip.setOnLongClickListener(v -> {
+                if (learned.remove(word)) {
+                    Toast.makeText(LikhonIme.this, R.string.suggestion_forgotten,
+                            Toast.LENGTH_SHORT).show();
+                    lastSuggestionKey = "";
+                    updateSuggestions();
+                }
+                return true;
+            });
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -937,6 +1125,7 @@ public class LikhonIme extends InputMethodService
             return;
         }
         if (bangla) {
+            learned.add(word, composing ? rawWord.toString() : null);
             if (composing) {
                 // Replace the composing region with the chosen word, then end
                 // composing and only add the space.
@@ -951,10 +1140,12 @@ public class LikhonIme extends InputMethodService
             if (!typed.isEmpty()) {
                 ic.deleteSurroundingText(typed.length(), 0);
             }
+            learned.add(word, null);
             ic.commitText(word + " ", 1);
         }
         afterTyped(" ");
-        hideCandidates();
+        lastSuggestionKey = "";
+        updateSuggestions();
     }
 
     /** Letters (plus apostrophes) immediately before the cursor. */

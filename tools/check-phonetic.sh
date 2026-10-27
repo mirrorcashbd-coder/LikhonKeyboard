@@ -12,7 +12,10 @@ javac -encoding UTF-8 -d "$out" \
   app/src/main/java/com/likhon/keyboard/VoiceText.java \
   tools/PhoneticCheck.java \
   tools/VoiceCheck.java \
-  tools/SuggestionCheck.java
+  app/src/main/java/com/likhon/keyboard/LearnedIndex.java \
+  tools/SuggestionCheck.java \
+  tools/LearnedCheck.java
 java -cp "$out" com.likhon.keyboard.PhoneticCheck
 java -cp "$out" com.likhon.keyboard.VoiceCheck
 java -cp "$out" com.likhon.keyboard.SuggestionCheck
+java -cp "$out" com.likhon.keyboard.LearnedCheck

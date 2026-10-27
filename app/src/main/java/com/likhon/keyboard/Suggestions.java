@@ -38,12 +38,14 @@ final class Suggestions {
 
     private final Context context;
 
+    private List<String> englishWords;
     private String[] englishSorted;
     private Map<String, Integer> englishRank;
 
     private String[] banglaRoman;
     private String[] banglaWords;
     private int[] banglaRank;
+    private String[] banglaPopular;
 
     Suggestions(Context context) {
         this.context = context.getApplicationContext();
@@ -53,6 +55,35 @@ final class Suggestions {
     void preload() {
         ensureEnglish();
         ensureBangla();
+    }
+
+    /**
+     * Common words, for the empty-prefix case where the strip still shows
+     * something useful: the most frequent English words, or the curated Bangla
+     * words in their hand-written order.
+     */
+    List<String> popular(boolean bangla, int max) {
+        List<String> out = new ArrayList<>();
+        if (max <= 0) {
+            return out;
+        }
+        if (bangla) {
+            ensureBangla();
+            for (String word : banglaPopular) {
+                if (out.size() >= max) {
+                    break;
+                }
+                if (!out.contains(word)) {
+                    out.add(word);
+                }
+            }
+            return out;
+        }
+        ensureEnglish();
+        for (int i = 0; i < englishWords.size() && out.size() < max; i++) {
+            out.add(englishWords.get(i));
+        }
+        return out;
     }
 
     List<String> english(String prefix) {
@@ -78,7 +109,7 @@ final class Suggestions {
     }
 
     List<String> bangla(String romanPrefix) {
-        if (romanPrefix == null || romanPrefix.length() < 2) {
+        if (romanPrefix == null || romanPrefix.isEmpty()) {
             return Collections.emptyList();
         }
         ensureBangla();
@@ -138,6 +169,7 @@ final class Suggestions {
             return;
         }
         List<String> words = readLines("words_en.txt");
+        englishWords = words;
         englishSorted = words.toArray(new String[0]);
         Arrays.sort(englishSorted);
         Map<String, Integer> ranks = new HashMap<>(words.size() * 2);
@@ -175,6 +207,30 @@ final class Suggestions {
             } catch (NumberFormatException e) {
                 banglaRank[i] = Integer.MAX_VALUE;
             }
+        }
+        buildBanglaPopular();
+    }
+
+    /**
+     * The curated Bangla words occupy the first few hundred ranks; collect them
+     * once so an empty strip can show them without sorting 18,000 rows.
+     */
+    private void buildBanglaPopular() {
+        List<Integer> best = new ArrayList<>();
+        for (int i = 0; i < banglaRank.length; i++) {
+            if (banglaRank[i] < 500) {
+                best.add(i);
+            }
+        }
+        Collections.sort(best, new Comparator<Integer>() {
+            @Override
+            public int compare(Integer a, Integer b) {
+                return Integer.compare(banglaRank[a], banglaRank[b]);
+            }
+        });
+        banglaPopular = new String[best.size()];
+        for (int i = 0; i < best.size(); i++) {
+            banglaPopular[i] = banglaWords[best.get(i)];
         }
     }
 
