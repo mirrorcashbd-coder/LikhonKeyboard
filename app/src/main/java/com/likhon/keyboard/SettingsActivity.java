@@ -10,8 +10,10 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
@@ -390,7 +392,13 @@ public class SettingsActivity extends Activity {
     private View buildContent() {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
-        scroll.setBackgroundColor(palette.bg);
+        if (palette.hasGradient()) {
+            scroll.setBackground(new GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{palette.bgTop, palette.bgBottom}));
+        } else {
+            scroll.setBackgroundColor(palette.bg);
+        }
         scroll.setClipToPadding(false);
 
         LinearLayout root = Ui.vertical(this);
@@ -400,20 +408,41 @@ public class SettingsActivity extends Activity {
                 ScrollView.LayoutParams.WRAP_CONTENT));
 
         // ------------------------------------------------------------ header
-        LinearLayout header = Ui.horizontal(this);
+        LinearLayout hero = new LinearLayout(this);
+        hero.setOrientation(LinearLayout.HORIZONTAL);
+        hero.setGravity(Gravity.CENTER_VERTICAL);
+        hero.setPadding(dp(18), dp(18), dp(16), dp(18));
+        GradientDrawable heroBg = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{palette.accent, palette.accentPressed});
+        heroBg.setCornerRadius(dp(22));
+        hero.setBackground(heroBg);
+
         ImageView icon = new ImageView(this);
         icon.setImageResource(R.mipmap.ic_launcher);
-        header.addView(icon, new LinearLayout.LayoutParams(dp(56), dp(56)));
+        icon.setBackground(Ui.rounded(this, 0x33FFFFFF, 16));
+        icon.setPadding(dp(8), dp(8), dp(8), dp(8));
+        hero.addView(icon, new LinearLayout.LayoutParams(dp(56), dp(56)));
 
         LinearLayout headings = Ui.vertical(this);
         headings.setPadding(dp(14), 0, 0, 0);
-        TextView name = Ui.text(this, getString(R.string.app_name), 21, palette.text, true);
-        TextView tagline = Ui.text(this, getString(R.string.tagline), 12.5f, palette.textMuted, false);
+        TextView name = Ui.text(this, getString(R.string.app_name), 22, palette.onAccent, true);
+        int faded = (palette.onAccent & 0x00FFFFFF) | 0xB3000000;
+        TextView tagline = Ui.text(this, getString(R.string.tagline), 12.5f, faded, false);
         tagline.setPadding(0, dp(4), 0, 0);
         headings.addView(name);
         headings.addView(tagline);
-        header.addView(headings);
-        addWithTopMargin(root, header, 0);
+        hero.addView(headings, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView versionPill = Ui.text(this, getString(R.string.hero_version), 11,
+                palette.onAccent, true);
+        versionPill.setPadding(dp(10), dp(5), dp(10), dp(5));
+        versionPill.setBackground(Ui.rounded(this,
+                Palette.mix(palette.accent, palette.onAccent, 0.18f), 20));
+        hero.addView(versionPill);
+
+        addWithTopMargin(root, hero, 0);
 
         // ------------------------------------------------------ status card
         LinearLayout statusCard = Ui.card(this, palette);
@@ -581,8 +610,15 @@ public class SettingsActivity extends Activity {
 
         // -------------------------------------------------- appearance card
         LinearLayout themeCard = Ui.card(this, palette);
-        themeChips = Ui.horizontal(this);
+        themeChips = Ui.vertical(this);
         themeCard.addView(themeChips);
+
+        ThemePreviewView preview = new ThemePreviewView(this);
+        preview.setPalette(palette);
+        LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(118));
+        previewParams.topMargin = dp(12);
+        themeCard.addView(preview, previewParams);
 
         TextView accentLabel = Ui.text(this, getString(R.string.accent), 13,
                 palette.text, true);
@@ -610,6 +646,19 @@ public class SettingsActivity extends Activity {
                 getString(R.string.size_normal),
                 getString(R.string.size_large)}, prefs.labelSize(), value -> {
             prefs.setLabelSize(value);
+            recreate();
+        }, 3, 0);
+
+        TextView gapLabel = Ui.text(this, getString(R.string.key_gap), 13,
+                palette.text, true);
+        gapLabel.setPadding(0, dp(18), 0, dp(8));
+        themeCard.addView(gapLabel);
+        int gapIndex = prefs.keyGap() < 5f ? 0 : (prefs.keyGap() > 7.5f ? 2 : 1);
+        addChipGrid(themeCard, new String[]{
+                getString(R.string.gap_compact),
+                getString(R.string.gap_normal),
+                getString(R.string.gap_airy)}, gapIndex, value -> {
+            prefs.setKeyGap(value);
             recreate();
         }, 3, 0);
 
@@ -778,20 +827,50 @@ public class SettingsActivity extends Activity {
 
     private void rebuildThemeChips() {
         themeChips.removeAllViews();
-        int[] values = {Prefs.THEME_SYSTEM, Prefs.THEME_LIGHT, Prefs.THEME_DARK};
-        int[] labels = {R.string.theme_system, R.string.theme_light, R.string.theme_dark};
+        int[] values = {Prefs.THEME_SYSTEM, Prefs.THEME_LIGHT, Prefs.THEME_DARK,
+                Prefs.THEME_AURORA, Prefs.THEME_MIDNIGHT, Prefs.THEME_PAPER,
+                Prefs.THEME_GLACIER, Prefs.THEME_NEON, Prefs.THEME_GRAPHITE};
+        int[] labels = {R.string.theme_system, R.string.theme_light, R.string.theme_dark,
+                R.string.theme_aurora, R.string.theme_midnight, R.string.theme_paper,
+                R.string.theme_glacier, R.string.theme_neon, R.string.theme_graphite};
+        boolean systemDark = (getResources().getConfiguration().uiMode
+                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        LinearLayout row = null;
         for (int i = 0; i < values.length; i++) {
+            if (i % 3 == 0) {
+                row = Ui.horizontal(this);
+                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT);
+                if (i > 0) {
+                    rowParams.topMargin = dp(8);
+                }
+                themeChips.addView(row, rowParams);
+            }
             final int value = values[i];
-            TextView chip = makeChip(getString(labels[i]), prefs.theme() == value, () -> {
+            Palette themePalette = Palette.preview(value, systemDark, prefs.accent());
+            boolean selected = prefs.theme() == value;
+            TextView chip = Ui.text(this, getString(labels[i]), 12, themePalette.text, true);
+            chip.setGravity(Gravity.CENTER);
+            chip.setPadding(dp(4), dp(13), dp(4), dp(13));
+            GradientDrawable chipBg = new GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{themePalette.bgTop, themePalette.bgBottom});
+            chipBg.setCornerRadius(dp(12));
+            chipBg.setStroke(dp(selected ? 2 : 1),
+                    selected ? palette.accent : themePalette.keyStroke);
+            chip.setBackground(chipBg);
+            chip.setClickable(true);
+            chip.setOnClickListener(v -> {
                 prefs.setTheme(value);
                 recreate();
             });
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-            if (i > 0) {
+            if (i % 3 != 0) {
                 params.leftMargin = dp(8);
             }
-            themeChips.addView(chip, params);
+            row.addView(chip, params);
         }
     }
 

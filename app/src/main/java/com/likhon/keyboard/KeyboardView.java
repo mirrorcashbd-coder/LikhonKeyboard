@@ -43,6 +43,7 @@ public class KeyboardView extends View {
 
     // Appearance knobs, set from the settings screen.
     private float keyRadiusDp = KEY_RADIUS_DP;
+    private float gapDp = GAP_DP;
     private float labelScale = 1f;
     private boolean keyBorders = true;
 
@@ -223,7 +224,7 @@ public class KeyboardView extends View {
         int count = Math.max(1, layoutRows.size());
         int wanted = Math.round((PAD_TOP_DP + PAD_BOTTOM_DP) * density
                 + count * rowHeightPx
-                + (count - 1) * GAP_DP * density);
+                + (count - 1) * gapDp * density);
         int heightMode = MeasureSpec.getMode(heightMeasureSpec);
         int heightSize = MeasureSpec.getSize(heightMeasureSpec);
         int height;
@@ -252,7 +253,7 @@ public class KeyboardView extends View {
         float padSide = PAD_SIDE_DP * density;
         float padTop = PAD_TOP_DP * density;
         float padBottom = PAD_BOTTOM_DP * density;
-        float gap = GAP_DP * density;
+        float gap = gapDp * density;
 
         float availableH = height - padTop - padBottom - gap * (count - 1);
         float rowH = Math.max(dp(28), availableH / count);
@@ -290,7 +291,9 @@ public class KeyboardView extends View {
 
     @Override
     protected void onDraw(Canvas canvas) {
-        canvas.drawColor(palette.bg);
+        if (!palette.hasGradient()) {
+            canvas.drawColor(palette.bg);
+        }
         int count = Math.min(layoutRows.size(), keyRects.size());
         for (int r = 0; r < count; r++) {
             Key[] keys = layoutRows.get(r).keys;
@@ -313,6 +316,18 @@ public class KeyboardView extends View {
             bg = pressed ? palette.keyPressed : palette.keyBg;
         }
         float radius = Math.min(dp(keyRadiusDp), r.height() / 2f);
+        if (palette.shadow != 0) {
+            tmpRect.set(r);
+            tmpRect.offset(0, dp(1.4f));
+            fillPaint.setColor(palette.shadow);
+            canvas.drawRoundRect(tmpRect, radius, radius, fillPaint);
+        }
+        if (accent && palette.glow != 0) {
+            tmpRect.set(r);
+            tmpRect.inset(-dp(1.6f), -dp(1.6f));
+            fillPaint.setColor(palette.glow);
+            canvas.drawRoundRect(tmpRect, radius + dp(1.6f), radius + dp(1.6f), fillPaint);
+        }
         fillPaint.setColor(bg);
         canvas.drawRoundRect(r, radius, radius, fillPaint);
 
@@ -540,6 +555,17 @@ public class KeyboardView extends View {
     }
 
     private boolean showPreview = true;
+
+    void setKeyGap(float value) {
+        if (gapDp != value) {
+            gapDp = value;
+            if (getWidth() > 0 && getHeight() > 0) {
+                computeRects(getWidth(), getHeight());
+            }
+            requestLayout();
+            invalidate();
+        }
+    }
 
     void setKeyShape(int shape) {
         float radius = shape == 0 ? 4f : (shape == 2 ? 200f : KEY_RADIUS_DP);
@@ -819,7 +845,7 @@ public class KeyboardView extends View {
 
     private int findRow(float x, float y) {
         // Half a gap of slack, so the seams between rows are not dead space.
-        float slack = dp(GAP_DP / 2f);
+        float slack = dp(gapDp / 2f);
         for (int r = 0; r < keyRects.size(); r++) {
             List<RectF> rects = keyRects.get(r);
             if (rects.isEmpty()) {

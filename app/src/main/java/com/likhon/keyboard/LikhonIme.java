@@ -7,6 +7,9 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.inputmethodservice.InputMethodService;
 import android.os.Handler;
 import android.os.Looper;
@@ -131,6 +134,7 @@ public class LikhonIme extends InputMethodService
         return Math.min(MAX_SUGGESTIONS, prefs.suggestionCount());
     }
 
+    private LinearLayout rootView;
     private Language language = Languages.byCode("en");
     private boolean bangla;
     private boolean shift;
@@ -184,6 +188,7 @@ public class LikhonIme extends InputMethodService
         keyboardView.setListener(this);
 
         LinearLayout root = new LinearLayout(this);
+        rootView = root;
         root.setOrientation(LinearLayout.VERTICAL);
         suggestions = new Suggestions(this);
         learned = new LearnedWords(this);
@@ -544,12 +549,27 @@ public class LikhonIme extends InputMethodService
         keyboardView.setFeedback(prefs.haptic(), prefs.sound());
         keyboardView.setShowPreview(prefs.showPopup());
         keyboardView.setKeyShape(prefs.keyShape());
+        keyboardView.setKeyGap(prefs.keyGap());
         keyboardView.setKeyBorders(prefs.keyBorders());
         keyboardView.setLabelScale(prefs.labelSize() == 0 ? 0.9f
                 : (prefs.labelSize() == 2 ? 1.09f : 1f));
         styleVoicePanel();
+        if (rootView != null) {
+            if (palette.hasGradient()) {
+                rootView.setBackground(new GradientDrawable(
+                        GradientDrawable.Orientation.TOP_BOTTOM,
+                        new int[]{palette.bgTop, palette.bgBottom}));
+            } else {
+                rootView.setBackgroundColor(palette.bg);
+            }
+        }
         if (resizeHandle != null) {
-            resizeHandle.setBackgroundColor(palette.bg);
+            resizeHandle.setBackgroundColor(palette.hasGradient()
+                    ? Color.TRANSPARENT : palette.bg);
+        }
+        if (toolBar != null) {
+            toolBar.setBackgroundColor(palette.hasGradient()
+                    ? Color.TRANSPARENT : palette.bg);
         }
         if (gripView != null) {
             gripView.setBackground(Ui.rounded(this, palette.keySpecial, 2));
@@ -558,7 +578,6 @@ public class LikhonIme extends InputMethodService
             voiceLevel.setBackground(Ui.rounded(this, palette.accent, 2));
         }
         if (toolBar != null) {
-            toolBar.setBackgroundColor(palette.bg);
             styleToolBar();
         }
         if (toolDivider != null) {
@@ -2407,14 +2426,19 @@ public class LikhonIme extends InputMethodService
             candidateScroll.setVisibility(View.GONE);
             return;
         }
-        for (final String word : words) {
+        for (int i = 0; i < words.size(); i++) {
+            final String word = words.get(i);
+            boolean first = i == 0;
             TextView chip = new TextView(this);
             chip.setText(word);
-            chip.setTextSize(15f);
+            chip.setTextSize(first ? 15.5f : 15f);
             chip.setSingleLine(true);
-            chip.setTextColor(palette.text);
+            chip.setTextColor(first ? palette.accent : palette.text);
+            chip.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
             chip.setPadding(dp(12), dp(7), dp(12), dp(7));
-            chip.setBackground(Ui.ripple(this, palette.keyBg, 9, palette.accent));
+            chip.setBackground(Ui.ripple(this,
+                    first ? Palette.mix(palette.keyBg, palette.accent, 0.14f) : palette.keyBg,
+                    9, palette.accent));
             chip.setOnClickListener(v -> pickSuggestion(word));
             chip.setOnLongClickListener(v -> {
                 if (learned.remove(word)) {

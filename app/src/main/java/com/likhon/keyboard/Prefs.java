@@ -31,6 +31,7 @@ final class Prefs {
     static final String KEY_KEY_SHAPE = "key_shape";
     static final String KEY_LABEL_SIZE = "label_size";
     static final String KEY_KEY_BORDERS = "key_borders";
+    static final String KEY_KEY_GAP = "key_gap";
     static final String KEY_SUGGESTIONS = "suggestions";
     static final String KEY_SUGGESTION_COUNT = "suggestion_count";
     static final String KEY_VOICE_TRAILING = "voice_trailing_space";
@@ -49,6 +50,12 @@ final class Prefs {
     static final int THEME_SYSTEM = 0;
     static final int THEME_LIGHT = 1;
     static final int THEME_DARK = 2;
+    static final int THEME_AURORA = 3;
+    static final int THEME_MIDNIGHT = 4;
+    static final int THEME_PAPER = 5;
+    static final int THEME_GLACIER = 6;
+    static final int THEME_NEON = 7;
+    static final int THEME_GRAPHITE = 8;
 
     private final SharedPreferences sp;
 
@@ -213,6 +220,16 @@ final class Prefs {
 
     void setLabelSize(int value) {
         sp.edit().putInt(KEY_LABEL_SIZE, value).apply();
+    }
+
+    /** Keyboard key spacing in dp: 4 = compact, 6 = normal, 9 = airy. */
+    float keyGap() {
+        int value = sp.getInt(KEY_KEY_GAP, 1);
+        return value == 0 ? 4f : (value == 2 ? 9f : 6f);
+    }
+
+    void setKeyGap(int value) {
+        sp.edit().putInt(KEY_KEY_GAP, value).apply();
     }
 
     boolean keyBorders() {

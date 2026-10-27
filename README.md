@@ -339,6 +339,27 @@ the toolbar above the suggestions.
 translate; incognito stops learning and clipboard capture; reset-all returns
 every setting to its default without touching the clipboard.
 
+## Design
+
+Six designed skins ship next to the plain light/dark pair. Each one carries its
+own vertical gradient, a soft key shadow and, where it helps, an accent glow:
+
+| Skin | Look |
+| --- | --- |
+| Aurora | indigo night, mint accent, soft glow |
+| Midnight | near-black navy, warm gold |
+| Paper | warm cream, terracotta |
+| Glacier | icy white-blue |
+| Neon | black with electric lime |
+| Graphite | calm grey with red |
+
+The appearance card shows a **live preview** painted with the same code the
+keyboard uses, so the gradient, shadow and accent are exactly what will type.
+Accent colour, key shape (square / rounded / pill), label size, key spacing
+(compact / normal / airy) and borders can be layered on any skin. The settings
+header is a gradient hero card, the keyboard background and toolbar share the
+skin's gradient, and the first suggestion is highlighted in the accent colour.
+
 ## Languages
 
 39 keyboard languages ship in the APK, all built from the same code-driven
@@ -392,6 +413,17 @@ with the current theme. Every tap plays a short squash-and-settle animation and
 undo/redo pivot to show the way the history moved.
 
 ## Changes
+
+**1.15**
+
+- Six designed skins: Aurora, Midnight, Paper, Glacier, Neon and Graphite,
+  with gradients, soft key shadows and accent glow.
+- Live theme preview in the appearance card, painted with the keyboard's own
+  drawing code.
+- Gradient hero header in the settings, gradient keyboard background/toolbar,
+  accent-highlighted first suggestion.
+- New key-spacing setting (compact / normal / airy) next to shape and label
+  size.
 
 **1.14**
 

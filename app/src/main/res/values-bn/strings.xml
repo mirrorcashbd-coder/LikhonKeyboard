@@ -45,7 +45,7 @@
 
     <string name="section_about">সম্পর্কে</string>
     <string name="about_body">লিখন একটি ছোট, অফলাইন কীবোর্ড। এতে বিজ্ঞাপন নেই এবং কোথাও কিছু পাঠায় না; মাইক্রোফোন কেবল ভয়েস টাইপিংয়ে ব্যবহার হয়। ইংরেজি সাধারণ QWERTY লেআউট; বাংলা ফোনেটিক, অর্থাৎ ইংরেজি অক্ষরে যেভাবে উচ্চারণ হয় সেভাবে লিখলেই বাংলা হয়।</string>
-    <string name="about_version">সংস্করণ ১.১৪</string>
+    <string name="about_version">সংস্করণ ১.১৫</string>
     <string name="footer">অফলাইন · বিজ্ঞাপন নেই · মাইক অনুমতি ঐচ্ছিক</string>
     <string name="about_guide">বাংলা টাইপিং নির্দেশিকা</string>
 
@@ -239,4 +239,15 @@
     <string name="backup_failed">ফাইলটি ব্যবহার করা গেল না: %1$s</string>
     <string name="backup_no_files">কোনো ফাইল ম্যানেজার পাওয়া যায়নি</string>
     <string name="about_libraries">লাইব্রেরি: OkHttp 3.14.9 · Okio 1.17.5 · Gson 2.10.1</string>
+    <string name="theme_aurora">অরোরা</string>
+    <string name="theme_midnight">মিডনাইট</string>
+    <string name="theme_paper">পেপার</string>
+    <string name="theme_glacier">গ্লেসিয়ার</string>
+    <string name="theme_neon">নিয়ন</string>
+    <string name="theme_graphite">গ্রাফাইট</string>
+    <string name="hero_version">v১.১৫</string>
+    <string name="key_gap">কী-এর ফাঁক</string>
+    <string name="gap_compact">ঘন</string>
+    <string name="gap_normal">স্বাভাবিক</string>
+    <string name="gap_airy">ফাঁকা</string>
 </resources>
