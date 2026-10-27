@@ -84,6 +84,14 @@ final class VoiceModels {
                 new long[]{29120534L, 130672026L, 816730L},
                 KIND_WHISPER, true, R.string.vm_note_base, true));
         MODELS.add(new Model(
+                "whisper-small",
+                "Whisper Small",
+                "csukuangfj/sherpa-onnx-whisper-small",
+                new String[]{"small-encoder.int8.onnx", "small-decoder.int8.onnx", "small-tokens.txt"},
+                new String[]{"encoder.int8.onnx", "decoder.int8.onnx", "tokens.txt"},
+                new long[]{112442483L, 262226114L, 816730L},
+                KIND_WHISPER, true, R.string.vm_note_small, false));
+        MODELS.add(new Model(
                 "parakeet-0.6b",
                 "Parakeet 0.6B",
                 "csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8",

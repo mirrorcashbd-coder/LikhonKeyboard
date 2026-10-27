@@ -133,6 +133,7 @@ inside the keyboard process.
 | --- | --- | --- | --- |
 | Whisper Tiny | বাংলা + English | 99 MB | fastest, short phrases |
 | Whisper Base | বাংলা + English | 153 MB | clearer; recommended |
+| Whisper Small | বাংলা + English | 358 MB | best Bangla; slower (about 3 s per phrase) |
 | Parakeet 0.6B | English | 631 MB | best English speed/accuracy; NVIDIA's model |
 
 3. In Settings → Voice → **Voice method**, pick **Offline (on this phone)**.
@@ -151,11 +152,16 @@ ends it, 30 s maximum), then decodes the phrase on a worker thread with
 phrase after the result. The engine is released after three idle minutes so a
 large Parakeet model does not sit in RAM forever.
 
-**Bangla accuracy:** Whisper Base is the practical offline choice, but it is
+**Bangla accuracy:** Whisper Small is the best Bangla option here and still
 noticeably weaker than Google's online Bangla model, especially for long
-sentences. Parakeet understands English only. Nothing here is a substitute for
-the online service for difficult Bangla dictation — it is the option that still
-works with no connection.
+sentences; Base is the balanced choice, Tiny is for short phrases. Parakeet
+understands English only. Nothing here replaces the online service for
+difficult Bangla dictation — it is the option that still works with no
+connection.
+
+Measured on this phone (arm64, four threads), 6.6 s of audio: Whisper Tiny
+loads in 0.94 s and decodes in 0.53 s; Whisper Small loads in 3.3 s and decodes
+in 3.0 s.
 
 ## Editing toolbar
 

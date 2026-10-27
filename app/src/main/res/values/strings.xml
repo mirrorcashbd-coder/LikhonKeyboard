@@ -353,6 +353,7 @@
     <string name="offline_manage">Offline voice models</string>
     <string name="vm_note_tiny">Fastest and smallest. Bangla and English; best for short phrases.</string>
     <string name="vm_note_base">Balanced. Bangla and English; clearer than Tiny.</string>
+    <string name="vm_note_small">Best Bangla accuracy in this engine; larger and slower than Base.</string>
     <string name="vm_note_parakeet">Best English accuracy and speed; English only. The model used by humming-keyboard.</string>
     <string name="voice_mode_offline">Offline (on this phone)</string>
     <string name="voice_offline_english_only">Parakeet understands English only. Choose a Whisper model for Bangla.</string>

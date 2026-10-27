@@ -353,6 +353,7 @@
     <string name="offline_manage">অফলাইন ভয়েস মডেল</string>
     <string name="vm_note_tiny">সবচেয়ে দ্রুত ও ছোট। বাংলা ও English; ছোট বাক্যের জন্য ভালো।</string>
     <string name="vm_note_base">ভারসাম্যপূর্ণ। বাংলা ও English; Tiny-এর চেয়ে পরিষ্কার।</string>
+    <string name="vm_note_small">এই ইঞ্জিনে বাংলার সেরা নির্ভুলতা; Base-এর চেয়ে বড় ও ধীর।</string>
     <string name="vm_note_parakeet">English-এ সেরা নির্ভুলতা ও গতি; শুধু English। humming-keyboard যে মডেল ব্যবহার করে।</string>
     <string name="voice_mode_offline">অফলাইন (এই ফোনেই)</string>
     <string name="voice_offline_english_only">Parakeet শুধু English বোঝে। বাংলার জন্য Whisper মডেল বেছে নিন।</string>
