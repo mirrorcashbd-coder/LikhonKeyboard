@@ -6,14 +6,14 @@ no AndroidX, no third-party libraries, no ads, and nothing of its own ever goes
 online (the `INTERNET` permission is declared only for speech services that run
 inside the calling app).
 
-**APK:** `build/manual/LikhonKeyboard-1.6.apk` (also copied to
-`/sdcard/Download/LikhonKeyboard-1.6.apk`)
+**APK:** `build/manual/LikhonKeyboard-1.7.apk` (also copied to
+`/sdcard/Download/LikhonKeyboard-1.7.apk`)
 
 ---
 
 ## Install
 
-1. Open `LikhonKeyboard-1.6.apk` in the Files app and allow "install unknown apps"
+1. Open `LikhonKeyboard-1.7.apk` in the Files app and allow "install unknown apps"
    for that app if asked.
 2. Open **Likhon Keyboard** from the app drawer.
 3. Tap **Enable keyboard** → turn on "Likhon Keyboard".
@@ -62,17 +62,16 @@ the keyboard to open settings at any time.
 
 Tap the **microphone** key (bottom row of the letters and symbols pages) once.
 
-By default the keyboard stays exactly where it is and a strip appears above
-the keys: microphone, language chip, level bar and **Stop**. Words appear as
-you speak, just like Gboard's Rambler.
-
-Long-press the mic key (or turn on the setting) to use the phone's own speech
-screen instead. That path covers phones which refuse to hand audio to an input
-method, but the keyboard hides while it is open.
+The keyboard stays exactly where it is and a strip appears above the keys:
+microphone, language chip, level bar and **Stop**. Words appear as you speak,
+like Gboard's Rambler. There is deliberately no separate speech screen: every
+step happens inside the keyboard.
 
 When the phone's speech service keeps hearing nothing, the strip tries the other
 Bangla model (bn-IN) and then Android's on-device recogniser, saying which one
-it is using.
+it is using. Every voice event (start, ready, speech started, error name,
+result, insert) is written to an in-memory **voice log** at the bottom of the
+voice settings, with a copy button, because there is no logcat on the phone.
 
 Settings also has a **Microphone check** (records 1.5 s and reports the level)
 and a **Speech service check** (runs one recognition and prints the result or
@@ -206,7 +205,7 @@ equivalent ARM64 build script is included. It uses the Ubuntu/Debian
 tools/build-apk-arm64.sh
 ```
 
-Output: `build/manual/LikhonKeyboard-1.6.apk` (signed with the debug key in
+Output: `build/manual/LikhonKeyboard-1.7.apk` (signed with the debug key in
 `keystore/likhon-debug.jks`, generated on first run — keep that file if you want
 future builds to install over the current one).
 
@@ -255,6 +254,15 @@ finger (key, long-press timer, delete-repeat timer), which is what allows
 simultaneous presses.
 
 ## Changes
+
+**1.7**
+
+- The phone's own speech screen is gone completely: no tap or long-press can
+  open it, and the settings switch that enabled it was removed. Voice typing
+  happens only inside the keyboard strip.
+- Settings gained a **voice log** (last 60 events with timestamps, copy button)
+  so the speech service's own answer can be read on the phone.
+- The voice tips now point at the log instead of at the removed screen.
 
 **1.6**
 
@@ -337,9 +345,9 @@ simultaneous presses.
 - Voice typing depends on the phone's speech service; it does nothing if none
   is installed, and Bangla needs a Bangla language pack. It cannot use Gboard's
   private Rambler implementation directly.
-- The phone's voice screen is a separate screen: it hides the keyboard for a
-  moment and the text appears when you come back. The inline strip avoids that
-  but depends on the speech service accepting an input method as its caller.
+- Speech recognition still depends on the phone's service accepting an input
+  method as its caller. If it does not, the strip says so and the voice log
+  shows the error name; there is no second screen to fall back to by design.
 - Voice punctuation only recognises the listed words, and `period`/`colon`
   count as punctuation only at the end of a phrase (they are common nouns).
 - The custom keyboard view is not fully accessible to TalkBack; keys are not

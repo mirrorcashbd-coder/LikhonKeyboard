@@ -38,13 +38,6 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".VoiceSheetActivity"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            android:taskAffinity="com.likhon.keyboard.voicesheet"
-            android:theme="@style/Theme.Likhon.Sheet" />
-
         <service
             android:name=".LikhonIme"
             android:exported="true"

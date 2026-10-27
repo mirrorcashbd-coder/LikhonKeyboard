@@ -39,7 +39,6 @@ import java.util.Locale;
  */
 public class LikhonIme extends InputMethodService
         implements KeyboardView.Listener, VoiceInput.Listener,
-        VoiceSheetActivity.Callback,
         SharedPreferences.OnSharedPreferenceChangeListener {
 
     private KeyboardView keyboardView;
@@ -55,13 +54,8 @@ public class LikhonIme extends InputMethodService
     private boolean voicePreviewing;
     private View voiceLevel;
     private LinearLayout.LayoutParams voiceLevelParams;
-    /** Package of the editor that opened the voice sheet, so late text lands
-     *  back in the right app. */
-    private String sheetPackage;
-    private String pendingSheetText;
-    private String pendingSheetPackage;
     private int voiceMisses;
-    private boolean voiceSheetHintShown;
+    private boolean voiceHelpShown;
     private boolean voiceOnDeviceTried;
     /** Language tried after Bangla (India) when bn-BD hears nothing. */
     private String voiceLangOverride;
@@ -104,7 +98,6 @@ public class LikhonIme extends InputMethodService
 
     @Override
     public void onDestroy() {
-        VoiceSheetActivity.setCallback(null);
         if (voice != null) {
             voice.destroy();
             voice = null;
@@ -317,7 +310,6 @@ public class LikhonIme extends InputMethodService
             caps = (inputType & InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS) != 0 && !bangla;
         }
         enterLabel = resolveEnterLabel(attribute);
-        commitPendingSheet(attribute);
     }
 
     @Override
@@ -332,7 +324,6 @@ public class LikhonIme extends InputMethodService
         }
         refreshLayout();
         updateSuggestions();
-        commitPendingSheet(info);
     }
 
     @Override
@@ -562,12 +553,6 @@ public class LikhonIme extends InputMethodService
 
     @Override
     public void onKeyLongPress(Key key) {
-        if (key != null && key.type == Key.MIC) {
-            // Long press: the phone's own voice screen, for phones that refuse
-            // to hand audio to an input method.
-            startVoiceSheet();
-            return;
-        }
         if (key != null && key.type == Key.LANGUAGE) {
             Intent intent = new Intent(this, SettingsActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
@@ -779,6 +764,7 @@ public class LikhonIme extends InputMethodService
     // ------------------------------------------------------------------ voice
 
     private void toggleVoice() {
+        VoiceLog.add("mic tapped");
         if (voiceListening) {
             stopVoice(false);
             return;
@@ -792,11 +778,8 @@ public class LikhonIme extends InputMethodService
             startActivity(intent);
             return;
         }
-        if (prefs.voiceSheet()) {
-            startVoiceSheet();
-            return;
-        }
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            VoiceLog.add("no recognition service");
             Toast.makeText(this, R.string.voice_unavailable, Toast.LENGTH_LONG).show();
             return;
         }
@@ -806,7 +789,7 @@ public class LikhonIme extends InputMethodService
         voicePreviewing = false;
         voiceListening = true;
         voiceMisses = 0;
-        voiceSheetHintShown = false;
+        voiceHelpShown = false;
         voiceOnDeviceTried = false;
         voiceLangOverride = null;
         keyboardView.setVoiceActive(true);
@@ -817,62 +800,6 @@ public class LikhonIme extends InputMethodService
             voice = new VoiceInput(this, this);
         }
         voice.start(voiceLanguage(), prefs.voiceContinuous());
-    }
-
-    /**
-     * Opens the phone's own voice screen instead of the inline stream. The
-     * sentence is handed back after the editor regains focus.
-     */
-    private void startVoiceSheet() {
-        finishWord();
-        hideCandidates();
-        EditorInfo editor = getCurrentInputEditorInfo();
-        sheetPackage = editor == null ? null : editor.packageName;
-        VoiceSheetActivity.setCallback(this);
-        Intent intent = new Intent(this, VoiceSheetActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                | Intent.FLAG_ACTIVITY_NO_ANIMATION
-                | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
-        try {
-            startActivity(intent);
-        } catch (RuntimeException e) {
-            sheetPackage = null;
-            VoiceSheetActivity.setCallback(null);
-            Toast.makeText(this, R.string.voice_err_generic, Toast.LENGTH_LONG).show();
-        }
-    }
-
-    @Override
-    public void onSheetText(String text) {
-        String target = sheetPackage;
-        sheetPackage = null;
-        if (text == null || text.trim().isEmpty()) {
-            return;
-        }
-        String converted = voiceText(text.trim());
-        if (converted.isEmpty()) {
-            return;
-        }
-        pendingSheetText = converted;
-        pendingSheetPackage = target;
-    }
-
-    /** Inserts a sentence that arrived while the editor was not focused. */
-    private void commitPendingSheet(EditorInfo info) {
-        if (pendingSheetText == null) {
-            return;
-        }
-        String text = pendingSheetText;
-        String expected = pendingSheetPackage;
-        String actual = info == null ? null : info.packageName;
-        pendingSheetText = null;
-        pendingSheetPackage = null;
-        if (expected != null && !expected.equals(actual)) {
-            // Another app took focus meanwhile; do not drop the words there.
-            return;
-        }
-        commit(text + " ");
-        learnSentence(text);
     }
 
     private void resetVoiceLevel() {
@@ -1124,6 +1051,7 @@ public class LikhonIme extends InputMethodService
         }
         voicePreviewing = false;
         commit(converted + " ");
+        VoiceLog.add("insert: " + converted);
         learnSentence(converted);
         if (voiceStatus != null) {
             voiceStatus.setText(converted);
@@ -1165,8 +1093,8 @@ public class LikhonIme extends InputMethodService
             if (tryOnDeviceFallback()) {
                 return;
             }
-            if (voiceMisses >= 6 && !voiceSheetHintShown) {
-                voiceSheetHintShown = true;
+            if (voiceMisses >= 6 && !voiceHelpShown) {
+                voiceHelpShown = true;
                 Toast.makeText(this, R.string.voice_check_hint, Toast.LENGTH_LONG).show();
             }
         } else {
@@ -1190,6 +1118,7 @@ public class LikhonIme extends InputMethodService
             return false;
         }
         voiceLangOverride = "bn-IN";
+        VoiceLog.add("retry with bn-IN");
         voice.cancel();
         voice.start("bn-IN", prefs.voiceContinuous());
         if (voiceStatus != null) {
@@ -1207,6 +1136,7 @@ public class LikhonIme extends InputMethodService
             return false;
         }
         voiceOnDeviceTried = true;
+        VoiceLog.add("retry with on-device recogniser");
         voice.preferOnDevice();
         if (voiceStatus != null) {
             voiceStatus.setText(R.string.voice_trying_on_device);
@@ -1239,6 +1169,7 @@ public class LikhonIme extends InputMethodService
         if (voicePanel != null) {
             voicePanel.setVisibility(View.VISIBLE);
         }
+        VoiceLog.add("stopped: " + VoiceInput.errorName(code));
         String message = voiceErrorMessage(code) + " (" + VoiceInput.errorName(code) + ")";
         if (voiceStatus != null) {
             voiceStatus.setText(message);

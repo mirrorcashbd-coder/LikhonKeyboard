@@ -99,6 +99,7 @@ final class VoiceInput implements RecognitionListener {
             return;
         }
         onDevice = true;
+        VoiceLog.add("switch to on-device recogniser");
         destroyRecognizer();
         handler.removeCallbacks(restart);
         begin();
@@ -124,6 +125,7 @@ final class VoiceInput implements RecognitionListener {
         this.continuous = continuous;
         this.onDevice = false;
         this.wantListening = true;
+        VoiceLog.add("start " + this.language + (continuous ? ", continuous" : ""));
         this.lastPartial = "";
         if (!available()) {
             wantListening = false;
@@ -159,15 +161,18 @@ final class VoiceInput implements RecognitionListener {
         try {
             recognizer.startListening(intent());
             startFailures = 0;
+            VoiceLog.add("listening");
             listener.onVoiceListening();
         } catch (RuntimeException e) {
             // Busy, unbound, or the service died underneath us.
             startFailures++;
+            VoiceLog.add("start failed: " + e);
             destroyRecognizer();
             if (startFailures >= 3) {
                 // Never spin forever behind a microphone that records nothing:
                 // surface the failure instead.
                 wantListening = false;
+                VoiceLog.add("gave up after " + startFailures + " start failures");
                 listener.onVoiceError(SpeechRecognizer.ERROR_CLIENT);
                 listener.onVoiceStopped();
                 return;
@@ -243,6 +248,7 @@ final class VoiceInput implements RecognitionListener {
 
     @Override
     public void onReadyForSpeech(Bundle params) {
+        VoiceLog.add("ready");
         if (wantListening) {
             listener.onVoiceListening();
         }
@@ -250,7 +256,7 @@ final class VoiceInput implements RecognitionListener {
 
     @Override
     public void onBeginningOfSpeech() {
-        // Nothing to draw; partials will follow.
+        VoiceLog.add("speech started");
     }
 
     @Override
@@ -271,6 +277,7 @@ final class VoiceInput implements RecognitionListener {
 
     @Override
     public void onEndOfSpeech() {
+        VoiceLog.add("speech ended");
     }
 
     @Override
@@ -279,6 +286,7 @@ final class VoiceInput implements RecognitionListener {
             // Cancelled or stopped by us; the error is just the shutdown.
             return;
         }
+        VoiceLog.add("error " + errorName(error) + (onDevice ? " (on-device)" : ""));
         if (onDevice && (error == 12 || error == 13)) {
             // The on-device model has no such language; go back to the phone's
             // normal service instead of stopping.
@@ -316,6 +324,7 @@ final class VoiceInput implements RecognitionListener {
     @Override
     public void onResults(Bundle results) {
         String text = best(results);
+        VoiceLog.add("result: " + (text.isEmpty() ? "(empty)" : shorten(text)));
         if (!text.isEmpty()) {
             lastPartial = "";
             listener.onVoiceResult(text);
@@ -375,6 +384,10 @@ final class VoiceInput implements RecognitionListener {
             default:
                 return "ERROR_" + error;
         }
+    }
+
+    private static String shorten(String text) {
+        return text.length() <= 70 ? text : text.substring(0, 70) + "…";
     }
 
     private String best(Bundle bundle) {

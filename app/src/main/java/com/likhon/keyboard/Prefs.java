@@ -19,7 +19,6 @@ final class Prefs {
     static final String KEY_VOICE_BANGLISH = "voice_banglish";
     static final String KEY_VOICE_CONTINUOUS = "voice_continuous";
     static final String KEY_VOICE_CLEANUP = "voice_cleanup";
-    static final String KEY_VOICE_SHEET = "voice_sheet";
     static final String KEY_HEIGHT = "keyboard_height";
 
     /** Voice language follows the typing language. */
@@ -89,11 +88,6 @@ final class Prefs {
 
     boolean voiceCleanup() {
         return sp.getBoolean(KEY_VOICE_CLEANUP, true);
-    }
-
-    /** Use the phone's own voice screen instead of the inline stream. */
-    boolean voiceSheet() {
-        return sp.getBoolean(KEY_VOICE_SHEET, false);
     }
 
     /** Keyboard size as a fraction of the calculated height (0.5 – 2.2). */

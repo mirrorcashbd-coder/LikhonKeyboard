@@ -45,7 +45,7 @@
 
     <string name="section_about">সম্পর্কে</string>
     <string name="about_body">লিখন একটি ছোট, অফলাইন কীবোর্ড। এতে বিজ্ঞাপন নেই এবং কোথাও কিছু পাঠায় না; মাইক্রোফোন কেবল ভয়েস টাইপিংয়ে ব্যবহার হয়। ইংরেজি সাধারণ QWERTY লেআউট; বাংলা ফোনেটিক, অর্থাৎ ইংরেজি অক্ষরে যেভাবে উচ্চারণ হয় সেভাবে লিখলেই বাংলা হয়।</string>
-    <string name="about_version">সংস্করণ ১.৬</string>
+    <string name="about_version">সংস্করণ ১.৭</string>
     <string name="footer">অফলাইন · বিজ্ঞাপন নেই · মাইক অনুমতি ঐচ্ছিক</string>
     <string name="about_guide">বাংলা টাইপিং নির্দেশিকা</string>
 
@@ -73,8 +73,7 @@
     <string name="voice_err_generic">ভয়েস টাইপিং হঠাৎ বন্ধ হয়ে গেল। আবার চেষ্টা করুন।</string>
     <string name="voice_heard_nothing">কিছু শোনা যায়নি — আবার বলুন (%1$s)</string>
     <string name="voice_retrying">মাইক আবার চালু হচ্ছে…</string>
-    <string name="voice_sheet_prompt">এখন বলুন</string>
-    <string name="voice_check_hint">এখনো লেখা আসছে না — মাইক কী চেপে ধরলে ফোনের ভয়েস স্ক্রিন খুলবে, অথবা সেটিংসে স্পিচ সার্ভিস পরীক্ষা দেখুন।</string>
+    <string name="voice_check_hint">এখনো লেখা আসছে না — সেটিংস → ভয়েস → ভয়েস লগ দেখুন কী কারণে আটকাচ্ছে।</string>
     <string name="voice_trying_bn_in">বাংলা (ভারত) দিয়ে চেষ্টা করছি…</string>
     <string name="voice_trying_on_device">অন-ডিভাইস ভয়েস দিয়ে চেষ্টা করছি…</string>
 
@@ -96,8 +95,6 @@
     <string name="opt_voice_continuous_desc">থামুন না চাপা পর্যন্ত প্রতিটি বাক্যের পর আবার শুরু হবে।</string>
     <string name="opt_voice_cleanup">কথা পরিষ্কার করবে</string>
     <string name="opt_voice_cleanup_desc">“উম”, “um”, আটকে যাওয়া ও একই শব্দ বারবার বলা বাদ দেবে।</string>
-    <string name="opt_voice_sheet">ফোনের ভয়েস স্ক্রিন ব্যবহার করবে</string>
-    <string name="opt_voice_sheet_desc">মাইক কী চেপে ধরলে একবার খুলবে। সবসময় এটি ব্যবহার করতে চাইলে চালু করুন; ফোনের স্পিচ স্ক্রিন খোলা থাকলে কীবোর্ড লুকাবে।</string>
     <string name="voice_note">রিকগনিশন ফোনের স্পিচ সার্ভিস (সাধারণত Google) করে। বাংলার জন্য ভাষা ডাউনলোড বা ইন্টারনেট লাগতে পারে; অ্যাপ নিজে ইন্টারনেটে যায় না।</string>
     <string name="mic_test_title">মাইক পরীক্ষা</string>
     <string name="mic_test_action">টেস্ট</string>
@@ -112,6 +109,10 @@
     <string name="voice_test_empty">স্পিচ সার্ভিস কিছু শোনেনি।</string>
     <string name="voice_test_failed">স্পিচ সার্ভিস জানাল: %1$s</string>
     <string name="voice_test_unavailable">এই ফোনে কোনো স্পিচ রিকগনিশন সার্ভিস পাওয়া যায়নি।</string>
+    <string name="voice_log_title">ভয়েস লগ</string>
+    <string name="voice_log_copy">কপি</string>
+    <string name="voice_log_copied">ভয়েস লগ কপি হয়েছে</string>
+    <string name="voice_log_empty">(এখনো কোনো ভয়েস ইভেন্ট নেই)</string>
     <string name="resize_hint">কীবোর্ডের আকার বদলাতে টেনে দেখুন</string>
     <string name="resize_reset">কীবোর্ডের আকার আগের মতো হলো</string>
     <string name="suggestion_forgotten">সাজেশন থেকে বাদ দেওয়া হলো</string>

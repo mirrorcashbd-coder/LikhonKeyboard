@@ -4,9 +4,13 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
@@ -31,6 +35,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -62,6 +67,7 @@ public class SettingsActivity extends Activity {
     private TextView micButton;
     private TextView micTestResult;
     private TextView voiceTestResult;
+    private TextView voiceLogView;
     private SpeechRecognizer speechTest;
     private final Handler testHandler = new Handler(Looper.getMainLooper());
     private final Runnable speechTimeout = () ->
@@ -87,6 +93,7 @@ public class SettingsActivity extends Activity {
         super.onResume();
         refreshStatus();
         refreshVoiceStatus();
+        refreshVoiceLog();
     }
 
     private void configureWindow() {
@@ -372,8 +379,6 @@ public class SettingsActivity extends Activity {
                 Prefs.KEY_VOICE_CONTINUOUS, prefs.voiceContinuous());
         addSwitchRow(card, R.string.opt_voice_cleanup, R.string.opt_voice_cleanup_desc,
                 Prefs.KEY_VOICE_CLEANUP, prefs.voiceCleanup());
-        addSwitchRow(card, R.string.opt_voice_sheet, R.string.opt_voice_sheet_desc,
-                Prefs.KEY_VOICE_SHEET, prefs.voiceSheet());
 
         LinearLayout micRow = Ui.horizontal(this);
         TextView micLabel = Ui.text(this, getString(R.string.mic_test_title), 13,
@@ -398,6 +403,21 @@ public class SettingsActivity extends Activity {
         addWithTopMargin(card, speechRow, 14);
         voiceTestResult = Ui.text(this, "", 12, palette.textMuted, false);
         card.addView(voiceTestResult);
+
+        LinearLayout logRow = Ui.horizontal(this);
+        TextView logLabel = Ui.text(this, getString(R.string.voice_log_title), 13,
+                palette.text, true);
+        logLabel.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        logRow.addView(logLabel);
+        logRow.addView(Ui.button(this, palette, getString(R.string.voice_log_copy), false,
+                this::copyVoiceLog));
+        addWithTopMargin(card, logRow, 14);
+        voiceLogView = Ui.text(this, "", 11, palette.textMuted, false);
+        voiceLogView.setTypeface(Typeface.MONOSPACE);
+        voiceLogView.setTextIsSelectable(true);
+        card.addView(voiceLogView);
+        refreshVoiceLog();
 
         TextView note = Ui.text(this, getString(R.string.voice_note), 12,
                 palette.textMuted, false);
@@ -455,6 +475,25 @@ public class SettingsActivity extends Activity {
             return;
         }
         requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_MIC);
+    }
+
+    private void refreshVoiceLog() {
+        if (voiceLogView == null) {
+            return;
+        }
+        String log = VoiceLog.dump();
+        voiceLogView.setText(log.isEmpty() ? getString(R.string.voice_log_empty) : log);
+    }
+
+    private void copyVoiceLog() {
+        String log = VoiceLog.dump();
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard == null) {
+            return;
+        }
+        clipboard.setPrimaryClip(ClipData.newPlainText(getString(R.string.voice_log_title),
+                log.isEmpty() ? getString(R.string.voice_log_empty) : log));
+        Toast.makeText(this, R.string.voice_log_copied, Toast.LENGTH_SHORT).show();
     }
 
     private void refreshVoiceStatus() {
@@ -523,11 +562,15 @@ public class SettingsActivity extends Activity {
                 }
                 if (level < 0) {
                     micTestResult.setText(R.string.mic_test_failed);
+                    VoiceLog.add("mic test: could not open the microphone");
                 } else if (level < 200) {
                     micTestResult.setText(getString(R.string.mic_test_silent, level));
+                    VoiceLog.add("mic test: silence (peak " + level + ")");
                 } else {
                     micTestResult.setText(getString(R.string.mic_test_ok, level));
+                    VoiceLog.add("mic test: ok (peak " + level + ")");
                 }
+                refreshVoiceLog();
             });
         }).start();
     }
@@ -631,6 +674,7 @@ public class SettingsActivity extends Activity {
         if (voiceTestResult != null) {
             voiceTestResult.setText(message);
         }
+        refreshVoiceLog();
     }
 
     private void stopSpeechTest() {
