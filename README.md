@@ -341,12 +341,19 @@ every setting to its default without touching the clipboard.
 
 ## Design
 
-The settings are **separate Material 3 screens**, not one endless scroll:
+Every settings screen is built from **liquid glass**: translucent panels with a
+diagonal specular rim, a top sheen, a hairline bright edge and a soft elevation
+shadow, floating over a backdrop made of four huge, smooth colour blobs. The
+blobs are already soft, so whatever shows through a panel reads as frosted
+glass without a blur pass.
+
+The screens are separate, each with its own floating glass top bar, back button,
+slide transition and back stack:
 
 | Screen | What lives there |
 | --- | --- |
-| Home | keyboard status, six quick tiles, guide and system links |
-| Appearance | themes, live preview, accent, key shape, label size, spacing, borders |
+| Home | keyboard status, six glass quick tiles, guide and system links |
+| Appearance | glass theme swatches, live preview, accent beads, key shape, size, spacing |
 | Typing | feedback, suggestions, number row, keyboard height, privacy |
 | Languages | writing mode and all 39 languages |
 | Voice | microphone, recognition engine, live tests and the log |
@@ -354,14 +361,12 @@ The settings are **separate Material 3 screens**, not one endless scroll:
 | Backup | export, import and reset |
 | About | version, libraries and the guide |
 
-Each screen has its own large top app bar, back button, slide transition and
-back stack. Depth is layered: every surface is a top-lit gradient plus a
-hairline outline plus a real elevation shadow. Tiles spring in when pressed,
-segmented controls carry a raised selected pill, and the switches are
-hand-drawn with a floating thumb and a spring animation. Everything derives
-from the palette, so the six designed skins (Aurora, Midnight, Paper, Glacier,
-Neon, Graphite), the plain light/dark pair and every accent colour work on
-every screen.
+Buttons, segmented controls, chips, fields and switches are all glass too: a
+raised pill marks the selected segment, the switch has a floating white bead
+with its own shadow, and every control has a bright rim that catches the light
+from the top-left. All of it is derived from the palette, so the six designed
+skins (Aurora, Midnight, Paper, Glacier, Neon, Graphite), the plain light/dark
+pair and all accent colours work on every screen.
 
 ## Languages
 
@@ -416,6 +421,16 @@ with the current theme. Every tap plays a short squash-and-settle animation and
 undo/redo pivot to show the way the history moved.
 
 ## Changes
+
+**1.17**
+
+- Liquid glass redesign across every settings screen: translucent panels,
+  diagonal specular rims, top sheen, bright hairline edges and soft shadows.
+- Floating glass top bar with a glass back button; glass tiles, chips,
+  segmented controls, fields and buttons.
+- Four-blob colour mesh backdrop behind the glass, derived from the accent.
+- Theme picker rebuilt as glass cards with gradient swatches.
+- Switch redrawn with a floating white bead and a glass track.
 
 **1.16**
 

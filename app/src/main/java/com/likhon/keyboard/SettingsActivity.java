@@ -192,8 +192,7 @@ public class SettingsActivity extends Activity {
             GradientDrawable circle = new GradientDrawable();
             circle.setShape(GradientDrawable.OVAL);
             circle.setColor(color);
-            circle.setStroke(dp(selected ? 3 : 1), selected ? palette.text
-                    : Palette.mix(color, palette.surface, 0.4f));
+            circle.setStroke(dp(selected ? 3 : 1), selected ? 0xFFFFFFFF : 0x99FFFFFF);
             GradientDrawable ovalMask = new GradientDrawable();
             ovalMask.setShape(GradientDrawable.OVAL);
             ovalMask.setColor(0xFFFFFFFF);
@@ -244,9 +243,7 @@ public class SettingsActivity extends Activity {
         field.setHint(hint);
         field.setSingleLine(true);
         field.setInputType(InputType.TYPE_CLASS_TEXT);
-        GradientDrawable bg = Ui.rounded(this, M3.surfaceLow(palette), 14);
-        bg.setStroke(dp(1), M3.outlineVariant(palette));
-        field.setBackground(bg);
+        field.setBackground(Glass.glass(this, palette, 16, 0));
         field.setPadding(dp(12), dp(10), dp(12), dp(10));
         return field;
     }
@@ -391,7 +388,7 @@ public class SettingsActivity extends Activity {
     private void configureWindow() {
         Window window = getWindow();
         window.setStatusBarColor(palette.bgTop);
-        window.setNavigationBarColor(palette.bg);
+        window.setNavigationBarColor(palette.bgTop);
         View decor = window.getDecorView();
         int flags = decor.getSystemUiVisibility();
         if (palette.dark) {
@@ -618,9 +615,7 @@ public class SettingsActivity extends Activity {
         field.setMinHeight(dp(58));
         field.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
                 | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-        GradientDrawable fieldBg = Ui.rounded(this, M3.surfaceLow(palette), 16);
-        fieldBg.setStroke(dp(1), M3.outlineVariant(palette));
-        field.setBackground(fieldBg);
+        field.setBackground(Glass.glass(this, palette, 16, 0));
         field.setPadding(dp(14), dp(12), dp(14), dp(12));
         LinearLayout.LayoutParams fieldParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -1040,29 +1035,30 @@ public class SettingsActivity extends Activity {
             boolean selected = prefs.theme() == value;
 
             LinearLayout chip = Ui.horizontal(this);
-            chip.setPadding(dp(9), dp(12), dp(9), dp(12));
-            GradientDrawable bg = M3.gradient(this, themePalette.bgTop,
-                    themePalette.bgBottom, 14,
-                    selected ? palette.accent : themePalette.keyStroke);
+            chip.setPadding(dp(7), dp(10), dp(9), dp(10));
+            GradientDrawable base = Glass.fill(this, palette, 18, 0);
             if (selected) {
-                bg.setStroke(dp(2), palette.accent);
+                base.setStroke(dp(2), palette.accent);
             }
             chip.setBackground(new android.graphics.drawable.RippleDrawable(
-                    android.content.res.ColorStateList.valueOf(0x22FFFFFF), bg,
-                    Ui.rounded(this, 0xFFFFFFFF, 14)));
-            chip.setElevation(dp(selected ? 2 : 0));
+                    android.content.res.ColorStateList.valueOf(0x1A000000), base,
+                    Ui.rounded(this, 0xFFFFFFFF, 18)));
+            chip.setElevation(dp(selected ? 3 : 1));
 
-            View dot = new View(this);
-            GradientDrawable dotBg = new GradientDrawable();
-            dotBg.setShape(GradientDrawable.OVAL);
-            dotBg.setColor(themePalette.accent);
-            dot.setBackground(dotBg);
-            LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(dp(9), dp(9));
-            dotParams.rightMargin = dp(7);
-            chip.addView(dot, dotParams);
+            View swatch = new View(this);
+            GradientDrawable swatchBg = new GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{themePalette.bgTop, themePalette.bgBottom});
+            swatchBg.setCornerRadius(dp(8));
+            swatchBg.setStroke(dp(1), 0x66FFFFFF);
+            swatch.setBackground(swatchBg);
+            LinearLayout.LayoutParams swatchParams = new LinearLayout.LayoutParams(
+                    dp(22), dp(22));
+            swatchParams.rightMargin = dp(7);
+            chip.addView(swatch, swatchParams);
 
             TextView name = Ui.text(this, getString(labels[i]), 10.5f,
-                    themePalette.text, true);
+                    palette.text, true);
             name.setSingleLine(true);
             name.setEllipsize(android.text.TextUtils.TruncateAt.END);
             chip.addView(name, new LinearLayout.LayoutParams(

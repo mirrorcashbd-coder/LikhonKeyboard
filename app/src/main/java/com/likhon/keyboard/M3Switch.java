@@ -86,37 +86,37 @@ final class M3Switch extends View {
         float h = getHeight();
         float radius = h / 2f;
 
-        int offTrack = M3.surfaceHighest(palette);
-        int onTrack = palette.accent;
+        // translucent glass track
+        int offTrack = (palette.dark ? 0x2A : 0x1F) << 24
+                | (palette.text & 0x00FFFFFF);
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Palette.mix(offTrack, onTrack, progress));
+        paint.setColor(Palette.mix(offTrack, palette.accent, progress));
         rect.set(0, 0, w, h);
         canvas.drawRoundRect(rect, radius, radius, paint);
 
-        if (progress < 0.5f) {
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(dp(1));
-            paint.setColor(M3.outline(palette));
-            rect.set(dp(0.5f), dp(0.5f), w - dp(0.5f), h - dp(0.5f));
-            canvas.drawRoundRect(rect, radius, radius, paint);
-            paint.setStyle(Paint.Style.FILL);
-        }
+        // specular rim
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(dp(1.1f));
+        paint.setColor((palette.dark ? 0x66 : 0x88) << 24 | 0x00FFFFFF);
+        rect.set(dp(0.5f), dp(0.5f), w - dp(0.5f), h - dp(0.5f));
+        canvas.drawRoundRect(rect, radius, radius, paint);
+        paint.setStyle(Paint.Style.FILL);
 
         float thumb = dp(THUMB_DP);
         float travel = w - thumb - dp(5);
         float left = dp(2.5f) + travel * progress;
         float cy = h / 2f;
 
-        paint.setColor(0x33000000);
-        canvas.drawCircle(left + thumb / 2f, cy + dp(1.2f), thumb / 2f, paint);
-
-        int thumbColor = palette.dark ? Palette.mix(palette.surface, palette.text, 0.9f)
-                : 0xFFFFFFFF;
-        if (progress > 0.02f) {
-            thumbColor = Palette.mix(thumbColor, palette.onAccent, progress);
-        }
-        paint.setColor(thumbColor);
+        // floating thumb: shadow, then a clear white bead with a bright rim
+        paint.setColor(0x40000000);
+        canvas.drawCircle(left + thumb / 2f, cy + dp(1.6f), thumb / 2f, paint);
+        paint.setColor(0xFFFFFFFF);
         canvas.drawCircle(left + thumb / 2f, cy, thumb / 2f, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(dp(0.8f));
+        paint.setColor(0x66FFFFFF);
+        canvas.drawCircle(left + thumb / 2f, cy, thumb / 2f - dp(0.4f), paint);
+        paint.setStyle(Paint.Style.FILL);
 
         if (isPressed()) {
             paint.setColor((palette.accent & 0x00FFFFFF) | 0x22000000);
