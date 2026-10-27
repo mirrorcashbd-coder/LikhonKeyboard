@@ -45,7 +45,7 @@
 
     <string name="section_about">About</string>
     <string name="about_body">Likhon is a small, offline keyboard. It has no ads and never sends anything anywhere; the microphone is used only for voice typing. English is a standard QWERTY layout; Bangla is phonetic, so you type the sound in English letters.</string>
-    <string name="about_version">Version 1.13</string>
+    <string name="about_version">Version 1.14</string>
     <string name="footer">Offline · No ads · Optional microphone</string>
     <string name="about_guide">Bangla typing guide</string>
 
@@ -230,4 +230,13 @@
     <string name="languages_desc">Tap a language to enable it. The globe key on the keyboard cycles through the enabled ones.</string>
     <string name="languages_now">Typing now: %1$s (%2$s)</string>
     <string name="languages_keep_one">Keep at least one language enabled</string>
+    <string name="section_backup">Backup and restore</string>
+    <string name="backup_desc">Save every setting, text shortcut and clipboard entry into one JSON file, and load it on another phone. The file goes wherever you choose; nothing is uploaded.</string>
+    <string name="backup_export">Export</string>
+    <string name="backup_import">Import</string>
+    <string name="backup_saved">Backup saved</string>
+    <string name="backup_restored">Restored %1$d settings, %2$d shortcuts and %3$d clips</string>
+    <string name="backup_failed">Could not use that file: %1$s</string>
+    <string name="backup_no_files">No file manager available</string>
+    <string name="about_libraries">Libraries: OkHttp 3.14.9 · Okio 1.17.5 · Gson 2.10.1</string>
 </resources>

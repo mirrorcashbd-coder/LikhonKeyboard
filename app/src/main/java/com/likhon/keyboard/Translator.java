@@ -5,21 +5,23 @@ import android.os.Looper;
 
 import org.json.JSONArray;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
+import java.util.concurrent.TimeUnit;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 /**
  * Small Bangla ↔ English translator for the keyboard.
  *
  * <p>It asks the public Google Translate endpoint that web pages use. Only the
  * text the user chooses to translate is sent, never the rest of the field, and
- * nothing is sent unless the translate button is pressed. Android's built-in
- * {@code org.json} parses the reply, so there is still no third-party library.
+ * nothing is sent unless the translate button is pressed. The request goes
+ * through OkHttp (installed from Maven Central, see {@code libs/}) so a slow
+ * network fails quickly and retries are handled in one place; {@code org.json}
+ * parses the reply.
  */
 final class Translator {
 
@@ -29,6 +31,12 @@ final class Translator {
     }
 
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
+
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(9, TimeUnit.SECONDS)
+            .callTimeout(12, TimeUnit.SECONDS)
+            .build();
 
     private Translator() {
     }
@@ -58,45 +66,38 @@ final class Translator {
             public void run() {
                 String translated = null;
                 String error = null;
-                HttpURLConnection connection = null;
                 try {
                     String url = "https://translate.googleapis.com/translate_a/single"
                             + "?client=gtx&dt=t&sl=" + URLEncoder.encode(from, "UTF-8")
                             + "&tl=" + URLEncoder.encode(to, "UTF-8")
                             + "&q=" + URLEncoder.encode(text, "UTF-8");
-                    connection = (HttpURLConnection) new URL(url).openConnection();
-                    connection.setConnectTimeout(8000);
-                    connection.setReadTimeout(9000);
-                    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Android)");
-                    InputStream in = connection.getInputStream();
-                    BufferedReader reader = new BufferedReader(
-                            new InputStreamReader(in, StandardCharsets.UTF_8));
-                    StringBuilder body = new StringBuilder();
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        body.append(line);
-                    }
-                    reader.close();
-                    JSONArray root = new JSONArray(body.toString());
-                    JSONArray segments = root.getJSONArray(0);
-                    StringBuilder out = new StringBuilder();
-                    for (int i = 0; i < segments.length(); i++) {
-                        JSONArray segment = segments.optJSONArray(i);
-                        if (segment != null && segment.length() > 0 && !segment.isNull(0)) {
-                            out.append(segment.getString(0));
+                    Request request = new Request.Builder()
+                            .url(url)
+                            .header("User-Agent", "Mozilla/5.0 (Android)")
+                            .build();
+                    try (Response response = CLIENT.newCall(request).execute()) {
+                        ResponseBody body = response.body();
+                        if (!response.isSuccessful() || body == null) {
+                            error = "http " + response.code();
+                        } else {
+                            JSONArray root = new JSONArray(body.string());
+                            JSONArray segments = root.getJSONArray(0);
+                            StringBuilder out = new StringBuilder();
+                            for (int i = 0; i < segments.length(); i++) {
+                                JSONArray segment = segments.optJSONArray(i);
+                                if (segment != null && segment.length() > 0 && !segment.isNull(0)) {
+                                    out.append(segment.getString(0));
+                                }
+                            }
+                            translated = out.toString().trim();
+                            if (translated.isEmpty()) {
+                                translated = null;
+                                error = "empty";
+                            }
                         }
-                    }
-                    translated = out.toString().trim();
-                    if (translated.isEmpty()) {
-                        translated = null;
-                        error = "empty";
                     }
                 } catch (Exception e) {
                     error = e.getClass().getSimpleName();
-                } finally {
-                    if (connection != null) {
-                        connection.disconnect();
-                    }
                 }
                 final String result = translated;
                 final String failure = error;

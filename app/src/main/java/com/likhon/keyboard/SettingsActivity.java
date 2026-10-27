@@ -15,6 +15,7 @@ import android.graphics.Typeface;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -39,6 +40,9 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +56,8 @@ public class SettingsActivity extends Activity {
     /** When the keyboard sends the user here to grant the mic permission. */
     public static final String EXTRA_REQUEST_MIC = "request_mic";
     private static final int REQUEST_MIC = 41;
+    private static final int REQUEST_EXPORT = 42;
+    private static final int REQUEST_IMPORT = 43;
 
     private Prefs prefs;
     private Palette palette;
@@ -668,6 +674,22 @@ public class SettingsActivity extends Activity {
         addWithTopMargin(typingCard, heightRow, 14);
         addSection(root, getString(R.string.section_typing), null, typingCard);
 
+        // ------------------------------------------------------ backup card
+        LinearLayout backupCard = Ui.card(this, palette);
+        backupCard.addView(Ui.text(this, getString(R.string.backup_desc), 13,
+                palette.textMuted, false));
+        LinearLayout backupRow = Ui.horizontal(this);
+        backupRow.addView(Ui.button(this, palette, getString(R.string.backup_export),
+                true, this::exportBackup));
+        LinearLayout.LayoutParams importParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        importParams.leftMargin = dp(8);
+        TextView importButton = Ui.button(this, palette, getString(R.string.backup_import),
+                false, this::importBackup);
+        backupRow.addView(importButton, importParams);
+        addWithTopMargin(backupCard, backupRow, 12);
+        addSection(root, getString(R.string.section_backup), null, backupCard);
+
         // ------------------------------------------------------- about card
         LinearLayout aboutCard = Ui.card(this, palette);
         TextView about = Ui.text(this, getString(R.string.about_body), 13,
@@ -695,6 +717,11 @@ public class SettingsActivity extends Activity {
                 + getString(R.string.footer), 12, palette.textMuted, false);
         version.setPadding(0, dp(10), 0, 0);
         aboutCard.addView(version);
+
+        TextView libraries = Ui.text(this, getString(R.string.about_libraries), 12,
+                palette.textMuted, false);
+        libraries.setPadding(0, dp(4), 0, 0);
+        aboutCard.addView(libraries);
         addSection(root, getString(R.string.section_about), null, aboutCard);
 
         return scroll;
@@ -1269,6 +1296,75 @@ public class SettingsActivity extends Activity {
                     .setMessage(R.string.voice_permission_denied_body)
                     .setPositiveButton(R.string.action_done, null)
                     .show();
+        }
+    }
+
+    // ---------------------------------------------------------------- backup
+
+    private void exportBackup() {
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("application/json");
+        intent.putExtra(Intent.EXTRA_TITLE, "likhon-backup.json");
+        try {
+            startActivityForResult(intent, REQUEST_EXPORT);
+        } catch (ActivityNotFoundException e) {
+            Toast.makeText(this, R.string.backup_no_files, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void importBackup() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("application/json");
+        try {
+            startActivityForResult(intent, REQUEST_IMPORT);
+        } catch (ActivityNotFoundException e) {
+            Toast.makeText(this, R.string.backup_no_files, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) {
+            return;
+        }
+        Uri uri = data.getData();
+        if (requestCode == REQUEST_EXPORT) {
+            try (OutputStream out = getContentResolver().openOutputStream(uri)) {
+                if (out == null) {
+                    throw new IllegalStateException("no stream");
+                }
+                out.write(Backup.toJson(this).getBytes(StandardCharsets.UTF_8));
+                out.flush();
+                Toast.makeText(this, R.string.backup_saved, Toast.LENGTH_LONG).show();
+            } catch (Exception e) {
+                Toast.makeText(this, getString(R.string.backup_failed, e.getClass().getSimpleName()),
+                        Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
+        if (requestCode == REQUEST_IMPORT) {
+            try (InputStream in = getContentResolver().openInputStream(uri)) {
+                if (in == null) {
+                    throw new IllegalStateException("no stream");
+                }
+                java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+                byte[] chunk = new byte[8192];
+                int read;
+                while ((read = in.read(chunk)) > 0) {
+                    buffer.write(chunk, 0, read);
+                }
+                Backup.Restored restored = Backup.restore(this,
+                        new String(buffer.toByteArray(), StandardCharsets.UTF_8));
+                Toast.makeText(this, getString(R.string.backup_restored, restored.settings,
+                        restored.shortcuts, restored.clips), Toast.LENGTH_LONG).show();
+                recreate();
+            } catch (Exception e) {
+                Toast.makeText(this, getString(R.string.backup_failed, e.getClass().getSimpleName()),
+                        Toast.LENGTH_LONG).show();
+            }
         }
     }
 

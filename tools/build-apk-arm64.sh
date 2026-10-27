@@ -20,8 +20,8 @@ SDK="${ANDROID_SDK_ROOT:-/root/android-sdk}"
 PLATFORM="$SDK/platforms/android-34/android.jar"
 D8_JAR="$SDK/build-tools/34.0.0/lib/d8.jar"
 OUT="build/manual"
-VERSION_NAME="1.13"
-VERSION_CODE="14"
+VERSION_NAME="1.14"
+VERSION_CODE="15"
 MIN_SDK="23"
 TARGET_SDK="34"
 
@@ -44,6 +44,10 @@ fi
 if [ ${#LIBS[@]} -gt 0 ]; then
     echo "==> libraries: ${LIBS[*]}"
 fi
+COMPILE_CP="$PLATFORM"
+for jar in "${LIBS[@]}"; do
+    COMPILE_CP="$COMPILE_CP:$jar"
+done
 
 rm -rf "$OUT"
 mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/dex" "$OUT/logs"
@@ -66,7 +70,7 @@ aapt package -f -m \
 echo "==> javac"
 find app/src/main/java "$OUT/gen" -name '*.java' > "$OUT/sources.txt"
 javac -encoding UTF-8 -source 11 -target 11 -Xlint:-options \
-    -classpath "$PLATFORM" \
+    -classpath "$COMPILE_CP" \
     -d "$OUT/classes" \
     @"$OUT/sources.txt"
 

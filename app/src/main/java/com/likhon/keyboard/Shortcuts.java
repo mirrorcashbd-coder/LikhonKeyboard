@@ -73,6 +73,10 @@ final class Shortcuts {
         return all().size();
     }
 
+    void clear() {
+        sp.edit().remove(KEY).apply();
+    }
+
     private void save(Map<String, String> map) {
         StringBuilder out = new StringBuilder();
         for (Map.Entry<String, String> entry : map.entrySet()) {

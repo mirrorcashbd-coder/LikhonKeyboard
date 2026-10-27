@@ -102,6 +102,20 @@ final class ClipStore {
         }
     }
 
+    synchronized void setPinnedByText(String text, boolean pinned) {
+        if (text == null) {
+            return;
+        }
+        load();
+        for (Entry entry : entries) {
+            if (entry.text.equals(text)) {
+                entry.pinned = pinned;
+                save();
+                return;
+            }
+        }
+    }
+
     synchronized void remove(long id) {
         load();
         for (int i = 0; i < entries.size(); i++) {

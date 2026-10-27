@@ -1,20 +1,23 @@
-# Optional libraries
+# Installed libraries
 
-Any `*.jar` in this folder is dexed into the APK by
-`tools/build-apk-arm64.sh`. Nothing is here by default: Likhon is built only
-against the Android framework (org.json, HttpURLConnection, VectorDrawable,
-AudioRecord, SpeechRecognizer), which keeps the APK small and the build fast on
-a phone.
+Downloaded from Maven Central; `tools/build-apk-arm64.sh` dexes every `*.jar`
+here into the APK.
 
-## Adding a library
+| File | Used for |
+| --- | --- |
+| `okhttp-3.14.9.jar` | translation requests (timeouts, retries) |
+| `okio-1.17.5.jar` | OkHttp's I/O layer |
+| `gson-2.10.1.jar` | backup/restore JSON |
 
-1. Drop a plain Java/Android `.jar` (classes only, no resources) here.
-2. Run `bash tools/build-apk-arm64.sh`; the script prints every jar it compiles.
+## Adding more
 
-## Why not AndroidX, Material Components or an AAR
+```bash
+bash tools/add-lib.sh group:artifact:version
+bash tools/build-apk-arm64.sh
+```
 
-Those ship resources and need `aapt2` + resource merging, which the ARM64
-`aapt` tool-chain used here cannot run. The Gradle build in the project root
-can use them on a normal computer, but they would multiply the APK size and
-replace code that already works (vector icons, ripples, cards). Everything the
-keyboard needs is in the framework, so none are required.
+Plain JARs are copied as is. AARs are unpacked and their `classes.jar` is kept;
+resources inside an AAR need the aapt2 resource pipeline, and the script says so
+when it sees them. AndroidX and Material Components are intentionally absent:
+they need a theme rewrite and add several megabytes for widgets this keyboard
+already implements itself.

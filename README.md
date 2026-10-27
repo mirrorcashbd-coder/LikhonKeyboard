@@ -363,15 +363,28 @@ engine, not a key map.
 
 ## Libraries
 
-The keyboard is built only against the Android framework (org.json,
-HttpURLConnection, VectorDrawable, AudioRecord, SpeechRecognizer): the APK is
-about 440 KB, starts instantly and has no supply chain. `libs/` is wired into
-the ARM64 build script, so a plain `.jar` library can be dropped in and is
-dexed automatically; `libs/README.md` explains why AndroidX/AAR libraries are
-not used (they need aapt2 and would add megabytes for things the framework
-already provides).
+Third-party code is installed from Maven Central with `tools/add-lib.sh` and
+dexed straight into the APK by both build paths:
 
-## Toolbar icons
+| Library | Version | Used for |
+| --- | --- | --- |
+| OkHttp | 3.14.9 | translation requests: timeouts, retries, one HTTP client |
+| Okio | 1.17.5 | OkHttp's I/O layer |
+| Gson | 2.10.1 | backup and restore of settings, shortcuts and clipboard (JSON) |
+
+```bash
+bash tools/add-lib.sh com.squareup.okhttp3:okhttp:3.14.9
+```
+
+A plain JAR is copied as is; an AAR is unpacked and its `classes.jar` is kept.
+AAR **resources** need the aapt2 pipeline (aapt2 2.19 runs on this phone), so a
+specific resource-carrying library can be wired in on request. AndroidX and
+Material Components are deliberately not used: they would add several megabytes
+and a theme rewrite for widgets this keyboard already draws itself, and the
+whole settings/backup stack would still depend on Google's support libraries
+for very little gain.
+
+## Toolbar icons## Toolbar icons
 
 The toolbar uses Material Design line icons as vector drawables
 (`res/drawable/ic_undo.xml` and friends, Apache 2.0) instead of emoji, tinted
@@ -379,6 +392,15 @@ with the current theme. Every tap plays a short squash-and-settle animation and
 undo/redo pivot to show the way the history moved.
 
 ## Changes
+
+**1.14**
+
+- Real third-party libraries installed from Maven Central and dexed into the
+  APK: OkHttp 3.14.9 + Okio 1.17.5 (translation) and Gson 2.10.1 (backup).
+- New backup and restore: every setting, text shortcut and clipboard entry to
+  one JSON file through the system file picker, and back on another phone.
+- `tools/add-lib.sh group:artifact:version` installs any Maven JAR or AAR
+  classes; the About card lists what is inside the build.
 
 **1.13**
 
