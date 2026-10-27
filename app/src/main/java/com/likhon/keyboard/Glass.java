@@ -2,9 +2,12 @@ package com.likhon.keyboard;
 
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.ColorFilter;
 import android.graphics.Color;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
+import android.graphics.PixelFormat;
+import android.graphics.Rect;
 import android.graphics.RadialGradient;
 import android.graphics.RectF;
 import android.graphics.Shader;
@@ -73,10 +76,10 @@ final class Glass {
         builtH = h;
         boolean dark = palette.dark;
 
-        int topAlpha = dark ? (kind == BAR ? 0x36 : 0x24)
-                : (kind == BAR ? 0xD4 : 0xB8);
-        int bottomAlpha = dark ? (kind == BAR ? 0x20 : 0x12)
-                : (kind == BAR ? 0xB6 : 0x92);
+        int topAlpha = dark ? (kind == BAR ? 0x30 : 0x1E)
+                : (kind == BAR ? 0xC8 : 0xA8);
+        int bottomAlpha = dark ? (kind == BAR ? 0x1C : 0x0E)
+                : (kind == BAR ? 0xAA : 0x82);
         fillPaint.setShader(new LinearGradient(0, 0, 0, h,
                 (topAlpha << 24) | 0x00FFFFFF, (bottomAlpha << 24) | 0x00FFFFFF,
                 Shader.TileMode.CLAMP));
@@ -94,31 +97,31 @@ final class Glass {
 
     // ------------------------------------------------------------- backdrops
 
-    /** A screen-sized mesh of smooth colour blobs behind the glass. */
-    static final class Backdrop extends View {
-        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    /**
+     * Paints the colour mesh that sits behind every glass panel: a soft base
+     * gradient and four huge, smooth blobs. Because the blobs are already
+     * soft, anything seen through a translucent panel reads as frosted glass
+     * without a real blur pass.
+     */
+    static final class BackdropPainter {
         private final Palette palette;
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private Shader base;
         private float builtW = -1;
         private float builtH = -1;
 
-        Backdrop(Context context, Palette palette) {
-            super(context);
+        BackdropPainter(Palette palette) {
             this.palette = palette;
-            setWillNotDraw(false);
         }
 
-        @Override
-        protected void onDraw(Canvas canvas) {
-            float w = getWidth();
-            float h = getHeight();
+        void draw(Canvas canvas, float w, float h) {
             if (w <= 0 || h <= 0) {
                 return;
             }
             if (base == null || w != builtW || h != builtH) {
                 builtW = w;
                 builtH = h;
-                base = new LinearGradient(0, 0, w * 0.4f, h,
+                base = new LinearGradient(0, 0, w * 0.35f, h,
                         palette.bgTop, palette.bgBottom, Shader.TileMode.CLAMP);
             }
             paint.setShader(base);
@@ -126,14 +129,14 @@ final class Glass {
             paint.setShader(null);
 
             int accent = palette.accent;
-            blob(canvas, w * 0.94f, -h * 0.02f, w * 1.0f, accent,
-                    palette.dark ? 0x4C : 0x3C);
-            blob(canvas, -w * 0.08f, h * 0.46f, w * 1.05f,
-                    shiftHue(accent, 46f), palette.dark ? 0x32 : 0x28);
-            blob(canvas, w * 0.42f, h * 1.02f, w * 0.95f,
-                    shiftHue(accent, -58f), palette.dark ? 0x2A : 0x1E);
-            blob(canvas, w * 0.24f, h * 0.02f, w * 0.62f, 0xFFFFFF,
-                    palette.dark ? 0x14 : 0x54);
+            blob(canvas, w * 0.94f, -h * 0.02f, w * 1.05f, accent,
+                    palette.dark ? 0x54 : 0x44);
+            blob(canvas, -w * 0.10f, h * 0.44f, w * 1.10f, shiftHue(accent, 46f),
+                    palette.dark ? 0x3A : 0x30);
+            blob(canvas, w * 0.45f, h * 1.04f, w * 1.00f, shiftHue(accent, -58f),
+                    palette.dark ? 0x30 : 0x26);
+            blob(canvas, w * 0.22f, h * 0.01f, w * 0.66f, 0xFFFFFF,
+                    palette.dark ? 0x18 : 0x64);
         }
 
         private void blob(Canvas canvas, float cx, float cy, float radius, int color,
@@ -146,11 +149,55 @@ final class Glass {
             paint.setShader(null);
         }
 
-        private static int shiftHue(int color, float degrees) {
+        static int shiftHue(int color, float degrees) {
             float[] hsv = new float[3];
             Color.colorToHSV(color, hsv);
             hsv[0] = (hsv[0] + degrees + 360f) % 360f;
             return Color.HSVToColor(hsv);
+        }
+    }
+
+    /** Screen-sized mesh backdrop. */
+    static final class Backdrop extends View {
+        private final BackdropPainter painter;
+
+        Backdrop(Context context, Palette palette) {
+            super(context);
+            painter = new BackdropPainter(palette);
+            setWillNotDraw(false);
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            painter.draw(canvas, getWidth(), getHeight());
+        }
+    }
+
+    /** The same mesh as a drawable, for views that only take a background. */
+    static final class BackdropDrawable extends Drawable {
+        private final BackdropPainter painter;
+
+        BackdropDrawable(Palette palette) {
+            painter = new BackdropPainter(palette);
+        }
+
+        @Override
+        public void draw(Canvas canvas) {
+            Rect bounds = getBounds();
+            painter.draw(canvas, bounds.width(), bounds.height());
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+        }
+
+        @Override
+        public void setColorFilter(ColorFilter colorFilter) {
+        }
+
+        @Override
+        public int getOpacity() {
+            return PixelFormat.TRANSLUCENT;
         }
     }
 

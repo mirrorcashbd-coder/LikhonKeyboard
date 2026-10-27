@@ -341,6 +341,13 @@ every setting to its default without touching the clipboard.
 
 ## Design
 
+The keyboard itself is glass too: every key is a translucent cap with a top
+sheen, a specular rim, a soft drop shadow and a live press animation — the key
+springs down under the finger, a wave of accent light spreads out from the
+touch point, and a slow sheen sweeps across the whole keyboard. Behind
+everything sits the same four-blob colour mesh, so the toolbar, the suggestion
+strip, the panels and the keys all read as clear glass over colour.
+
 Every settings screen is built from **liquid glass**: translucent panels with a
 diagonal specular rim, a top sheen, a hairline bright edge and a soft elevation
 shadow, floating over a backdrop made of four huge, smooth colour blobs. The
@@ -421,6 +428,16 @@ with the current theme. Every tap plays a short squash-and-settle animation and
 undo/redo pivot to show the way the history moved.
 
 ## Changes
+
+**1.18**
+
+- Keyboard rebuilt as clear glass: translucent key caps with a top sheen, a
+  specular rim and a real drop shadow, for letters, specials, space and enter.
+- Live press animation: the key springs down, a wave of accent light spreads
+  from the finger inside the key, and a sheen sweeps across the keyboard.
+- The keyboard background is the same four-blob colour mesh; toolbar,
+  suggestion strip, grip and panels are transparent or translucent glass.
+- Settings glass made clearer so the colour mesh shows through.
 
 **1.17**
 

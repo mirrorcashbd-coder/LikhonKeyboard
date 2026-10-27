@@ -555,24 +555,17 @@ public class LikhonIme extends InputMethodService
                 : (prefs.labelSize() == 2 ? 1.09f : 1f));
         styleVoicePanel();
         if (rootView != null) {
-            if (palette.hasGradient()) {
-                rootView.setBackground(new GradientDrawable(
-                        GradientDrawable.Orientation.TOP_BOTTOM,
-                        new int[]{palette.bgTop, palette.bgBottom}));
-            } else {
-                rootView.setBackgroundColor(palette.bg);
-            }
+            rootView.setBackground(new Glass.BackdropDrawable(palette));
         }
         if (resizeHandle != null) {
-            resizeHandle.setBackgroundColor(palette.hasGradient()
-                    ? Color.TRANSPARENT : palette.bg);
+            resizeHandle.setBackgroundColor(Color.TRANSPARENT);
         }
         if (toolBar != null) {
-            toolBar.setBackgroundColor(palette.hasGradient()
-                    ? Color.TRANSPARENT : palette.bg);
+            toolBar.setBackgroundColor(Color.TRANSPARENT);
         }
         if (gripView != null) {
-            gripView.setBackground(Ui.rounded(this, palette.keySpecial, 2));
+            gripView.setBackground(Ui.rounded(this,
+                    ((palette.dark ? 0x3A : 0x66) << 24) | 0x00FFFFFF, 2));
         }
         if (voiceLevel != null) {
             voiceLevel.setBackground(Ui.rounded(this, palette.accent, 2));
@@ -581,10 +574,12 @@ public class LikhonIme extends InputMethodService
             styleToolBar();
         }
         if (toolDivider != null) {
-            toolDivider.setBackgroundColor(palette.divider);
+            toolDivider.setBackgroundColor(
+                    ((palette.dark ? 0x1E : 0x2A) << 24) | 0x00FFFFFF);
         }
         if (panelHost != null) {
-            panelHost.setBackgroundColor(palette.surfaceAlt);
+            panelHost.setBackgroundColor(
+                    ((palette.dark ? 0xE8 : 0xF0) << 24) | (palette.surfaceAlt & 0x00FFFFFF));
         }
         if (candidateScroll != null && !prefs.suggestionsEnabled()) {
             candidateScroll.setVisibility(View.GONE);
@@ -945,7 +940,7 @@ public class LikhonIme extends InputMethodService
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setPadding(dp(3), 0, dp(3), 0);
-        bar.setBackgroundColor(palette.bg);
+        bar.setBackgroundColor(Color.TRANSPARENT);
         undoView = toolButton(bar, R.drawable.ic_undo, R.string.action_undo, this::performUndo);
         redoView = toolButton(bar, R.drawable.ic_redo, R.string.action_redo, this::performRedo);
         toolButton(bar, R.drawable.ic_clipboard, R.string.action_clipboard, this::toggleClipPanel);
@@ -969,7 +964,8 @@ public class LikhonIme extends InputMethodService
         view.setColorFilter(palette.text);
         view.setContentDescription(getString(description));
         view.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        view.setBackground(Ui.ripple(this, palette.bg, 10, palette.keyStroke));
+        view.setBackground(Ui.ripple(this, Color.TRANSPARENT, 12,
+                (palette.accent & 0x00FFFFFF) | 0x33000000));
         view.setClickable(true);
         view.setFocusable(true);
         int pad = dp(7);
@@ -1024,7 +1020,8 @@ public class LikhonIme extends InputMethodService
             View child = toolBar.getChildAt(i);
             if (child instanceof ImageView) {
                 ((ImageView) child).setColorFilter(palette.text);
-                child.setBackground(Ui.ripple(this, palette.bg, 10, palette.keyStroke));
+                child.setBackground(Ui.ripple(this, Color.TRANSPARENT, 12,
+                        (palette.accent & 0x00FFFFFF) | 0x33000000));
             }
         }
         refreshToolbar();
@@ -2092,7 +2089,8 @@ public class LikhonIme extends InputMethodService
         if (voicePanel == null || palette == null) {
             return;
         }
-        voicePanel.setBackgroundColor(palette.keySpecial);
+        voicePanel.setBackgroundColor(
+                ((palette.dark ? 0xE0 : 0xEC) << 24) | (palette.keySpecial & 0x00FFFFFF));
         voiceStatus.setTextColor(palette.text);
         voiceMode.setTextColor(palette.onAccent);
         voiceMode.setBackground(Ui.rounded(this, palette.accent, 10));
@@ -2436,9 +2434,10 @@ public class LikhonIme extends InputMethodService
             chip.setTextColor(first ? palette.accent : palette.text);
             chip.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
             chip.setPadding(dp(12), dp(7), dp(12), dp(7));
-            chip.setBackground(Ui.ripple(this,
-                    first ? Palette.mix(palette.keyBg, palette.accent, 0.14f) : palette.keyBg,
-                    9, palette.accent));
+            int chipFill = first
+                    ? ((palette.dark ? 0x3C : 0x40) << 24) | (palette.accent & 0x00FFFFFF)
+                    : ((palette.dark ? 0x1C : 0x8A) << 24) | 0x00FFFFFF;
+            chip.setBackground(Ui.ripple(this, chipFill, 11, palette.accent));
             chip.setOnClickListener(v -> pickSuggestion(word));
             chip.setOnLongClickListener(v -> {
                 if (learned.remove(word)) {
@@ -2455,7 +2454,7 @@ public class LikhonIme extends InputMethodService
             params.rightMargin = dp(6);
             candidateRow.addView(chip, params);
         }
-        candidateScroll.setBackgroundColor(palette.keySpecial);
+        candidateScroll.setBackgroundColor(Color.TRANSPARENT);
         candidateScroll.setVisibility(View.VISIBLE);
     }
 
